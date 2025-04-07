@@ -1,0 +1,12 @@
+type: linear_bce   # loss of linear stability assessment
+solar_sample_no: 8 # number of evenly sampled solar power between min and max
+xd: [0.16, 0.19, 0.12, 0.1, 0.25]
+gscr_threshold: 2.5
+over_value: 0.2  # gSCR threshold + over_value is the threshold for unstable samples
+saving_dir: "paper_exp/obf_result/obf_sco/"
+train_config:
+  no_data: 168
+  M: 5e2
+  alpha: 0.0
+  verbose: false
+  nn_dir: "paper_exp/obf_result/abf/acc_forecaster.pth"

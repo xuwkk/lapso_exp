@@ -1,0 +1,16 @@
+type: linear_bce
+solar_sample_no: 5
+# solar_sample_ratio_list: [0, 0.75, 0.85, 0.95, 1] # If is not None, the solar_sample_no is ignored
+solar_sample_ratio_list: null
+xd: [0.16, 0.13, 0.12, 0.2, 0.1]
+gscr_threshold: 2.5
+over_value: 0.05
+saving_dir: "paper_exp/sco_result/"
+start_date: 0
+end_date: -1
+renewable_rescale: 1.4
+train_config:
+  batch_size: 64
+  lr: 0.001
+  max_iter: 300
+  patience: 10

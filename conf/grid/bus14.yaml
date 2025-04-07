@@ -1,0 +1,98 @@
+pypower_case_name: case14
+config_xlsx_path: case14.xlsx
+data_dir: ./data/bus14/
+rescale_load: True
+renewable_min: 1
+renewable_load_ratio_max: 1.0
+baseMVA: 100
+rescale_line_limit:
+  force_new: true
+  min_pfmax: 10
+  scale_factor: 0.1 # randomly alter the final line limit from 90% to 110%
+extra_config:
+  bus:
+    BS: 
+      format: value 
+      value: [0.0]
+    GS:
+      format: value
+      value: [0.0]
+    LOAD_SHED:
+      format: value
+      value: [100.0]
+  gen:
+    PMAX:
+      format: value 
+      value: [160,140,100,120,150]
+    PMIN:
+      format: value 
+      value: [16,14,10,12,15]
+    RAMP_UP:
+      format: value 
+      value: [40,35,25,30,37.5]
+    RAMP_DOWN:
+      format: value 
+      value: [80,70,50,60,75]
+    RAMP_STARTUP:
+      format: value 
+      value: [80,70,50,60,75]
+    RAMP_SHUTDOWN:
+      format: value 
+      value: [80,70,50,60,75]
+    RAMP_UP_RD:
+      format: value 
+      value: [16,14,10,12,15]
+    RAMP_DOWN_RD:
+      format: value 
+      value: [40,35,25,30,37.5]
+    MIN_ON_TIME:
+      format: value
+      value: [3]
+    MIN_OFF_TIME:
+      format: value
+      value: [2]
+  branch:
+    TAP:
+      format: value 
+      value: [0.0]
+    SHIFT:
+      format: value 
+      value: [0.0]
+    BR_B:
+      format: value 
+      value: [0.0]
+  gencost:
+    STARTUP:
+      format: value 
+      value: [60,40,50,30,25]
+    SHUTDOWN:
+      format: value 
+      value: [10,15,5,17,8]
+    SECOND:
+      format: value 
+      value: [0.0,0.0,0.0,0.0,0.0]
+    FIRST:
+      format: value 
+      value: [3,1,6,4,5]
+    ZERO:
+      format: value 
+      value: [20,30,40,18,48]
+    STORAGE:
+      format: value 
+      value: [20.0,15.0,40.0,30.0,35.0]
+    RD_UP:
+      format: value 
+      value: [26,20,24,16,20]
+    RD_DOWN:
+      format: value 
+      value: [10,2,9,6,8]
+  solar:
+    INDEX:
+      format: value 
+      value: [5,11,13,14]
+    CAPACITY_RATIO:
+      format: value 
+      value: [0.1,0.06,0.05,0.15]
+    CURTAIL:
+      format: value 
+      value: [110.0,120.0,130.0,80.0]

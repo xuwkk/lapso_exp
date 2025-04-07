@@ -1,0 +1,5 @@
+saving_dir: "paper_exp/obf_result/abf/"
+train_config:
+  batch_size: 64
+  lr: 0.001
+  max_iter: 200

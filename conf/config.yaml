@@ -1,0 +1,13 @@
+defaults:
+  - grid: bus14
+  - operation: bus14_discrete
+  - exp: obf
+  - _self_
+random_seed: 123
+force_new_data: false
+force_new_grid: false
+optimization:
+  solver: "gurobi"
+  option:
+    warm_start: true
+    verbose: false

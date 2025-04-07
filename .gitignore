@@ -1,0 +1,14 @@
+__pycache__/
+lapso/*
+!lapso/.placeholder
+deleted/*
+data/*
+!data/.placeholder
+pso/*
+!pso/.placeholder
+paper_exp/obf_result/*
+paper_exp/sco_result/*
+*.pdf
+outputs/*
+*.out
+run_sco.py

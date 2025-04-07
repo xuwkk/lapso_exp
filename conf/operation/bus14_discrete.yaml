@@ -1,0 +1,10 @@
+baseMVA: 100
+with_binary: true
+T: 24
+ug_init: [1.0,1.0,1.0,1.0,1.0]          # initial ug
+pg_init_ratio: [0.5,0.5,0.0,0.0,0.0]    # initial pg ratio as the pgmax
+renewable_min: ${grid.renewable_min}    # set a slightly larger than 0
+with_pf_constraint: true
+with_reserve_constraint: true
+flexible_pg_init: true
+with_min_on_off_time: false

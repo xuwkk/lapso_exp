@@ -1,0 +1,11 @@
+saving_dir: "paper_exp/obf_result/obf_uncer/"
+budget_ratio: 0.05  # load ranging from 0.95 to 1.05
+max_iter: 100
+tol: 1e-3
+train_config:
+  no_data: 168
+  M_DP: 1e3  # big-M when linearizing the dispatch problem kkt
+  M_RD: 1e3  # big-M when linearizing the redispatch problem kkt
+  alpha: 0.0
+  verbose: false
+  nn_dir: "paper_exp/obf_result/abf/acc_forecaster.pth"

@@ -1,0 +1,7 @@
+saving_dir: "paper_exp/obf_result/obf_basic/"
+train_config:
+  no_data: 168
+  M: 5e2
+  alpha: 0.0
+  verbose: false
+  nn_dir: "paper_exp/obf_result/abf/acc_forecaster.pth"
