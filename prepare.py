@@ -1,6 +1,6 @@
 import hydra
 from omegaconf import DictConfig
-from pso import prepare_grid_from_pypower, prepare_data, get_dataset_np, UC_DISCRETE, prepare_pf_limit
+from pso import prepare_grid_from_pypower, prepare_data, get_dataset_np, UC_DISCRETE, refine_config
 
 @hydra.main(version_base=None, config_path="conf", config_name="config")
 def main(cfg: DictConfig):
@@ -13,7 +13,7 @@ def main(cfg: DictConfig):
     
     uc = UC_DISCRETE(grid_xlsx=grid_xlsx, operation_cfg=cfg.operation)
     
-    prepare_pf_limit(load_all, solar_all, wind_all, cfg.grid, cfg.optimization, uc)
+    refine_config(load_all, solar_all, wind_all, cfg.grid, cfg.optimization, uc)
     
 if __name__ == "__main__":
     main()

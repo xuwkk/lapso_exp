@@ -60,7 +60,7 @@ Evaluate the results
 """
 
 # Load results from different models
-sco_dir = "paper_exp/sco_result_3/"
+sco_dir = "paper_exp/sco_result/"
 models = {
     # model dir, 
     'linear_bce': ('bce_ori', 'bce_sco'),

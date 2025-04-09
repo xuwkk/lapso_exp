@@ -17,7 +17,7 @@ GREEN = '#44FF44'
 PURPLE = '#FF44FF'
 YELLOW = '#FFFF44'
 
-data_dir = 'paper_exp/obf_result_1'
+data_dir = 'paper_exp/obf_result'
 
 def evaluate_obf_sco():
     performance_dict = np.load(data_dir + '/obf_sco/performance_dict.npy', allow_pickle=True).item()
@@ -271,7 +271,7 @@ def evaluate_obf_sco():
     
 def plot_uncertainty_performance():
     # Load data
-    data_dir = 'paper_exp/obf_result_1/'
+    data_dir = 'paper_exp/obf_result/'
     # uncertainty_budget = [0.01, 0.03, 0.05, 0.07]
     # budget_percentage = ['1%', '3%', '5%', '7%']
 
@@ -296,7 +296,7 @@ def plot_uncertainty_performance():
         fig, ax = plt.subplots(figsize=(8, 4))
 
         # Set up data
-        labels = ['True', r'$\mathcal{P}_{train}^{abf}$', r'$\mathcal{P}_{train}^{obf}$', r'$\mathcal{P}_{train}^{obf/uncer}$('+budget_percentage[idx]+')']
+        labels = ['True', r'$\mathcal{P}_{train}^{abf}$', r'$\mathcal{P}_{train}^{obf/basic}$', r'$\mathcal{P}_{train}^{obf/uncer}$('+budget_percentage[idx]+')']
         original_costs = [np.mean(cost_true), np.mean(cost_abf), np.mean(cost_obf), np.mean(cost_obf_robust)]
         worst_costs = [np.mean(worst_cost_true), np.mean(worst_cost_abf), np.mean(worst_cost_obf), np.mean(worst_cost_obf_robust)]
 
@@ -339,7 +339,7 @@ def draw_sensitivity():
     """
     Sensitivity analysis for ABF, OBF/Basic, OBF/SCO
     """
-    data_dir = 'paper_exp/obf_result_1/'
+    data_dir = 'paper_exp/obf_result/'
     performance = np.load(data_dir + 'obf_sco/obf_sco_grad/performance.npy', allow_pickle=True).item()
     
     # Extract data
@@ -406,6 +406,6 @@ def draw_sensitivity():
     plt.close()
     
 if __name__ == '__main__':
-    evaluate_obf_sco()
+    # evaluate_obf_sco()
     plot_uncertainty_performance()
-    draw_sensitivity()
+    # draw_sensitivity()

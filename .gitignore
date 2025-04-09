@@ -12,3 +12,4 @@ paper_exp/sco_result/*
 outputs/*
 *.out
 run_sco.py
+!repo_figure/**
