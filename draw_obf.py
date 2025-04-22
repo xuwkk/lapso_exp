@@ -148,7 +148,7 @@ def evaluate_obf_sco():
     ax.scatter(abf_net_load[start_idx_:end_idx_], abf_cost[start_idx_:end_idx_]/100, 
               label=r'$\mathcal{P}_{train}^{abf}$', color=RED, alpha=0.6, s=50)
     ax.scatter(obf_net_load[start_idx_:end_idx_], obf_cost[start_idx_:end_idx_]/100, 
-              label=r'$\mathcal{P}_{train}^{obf}$', color=BLUE, alpha=0.6, s=50)
+              label=r'$\mathcal{P}_{train}^{obf/basic}$', color=BLUE, alpha=0.6, s=50)
     
     # Add mean points
     abf_mean_x = np.mean(abf_net_load[start_idx_:end_idx_])
@@ -159,7 +159,7 @@ def evaluate_obf_sco():
     ax.scatter(abf_mean_x, abf_mean_y, color=RED, marker='*', s=400, 
               label=r'$\mathcal{P}_{train}^{abf}$', edgecolor='black', linewidth=1)
     ax.scatter(obf_mean_x, obf_mean_y, color=BLUE, marker='*', s=400, 
-              label=r'$\mathcal{P}_{train}^{obf}$', edgecolor='black', linewidth=1)
+              label=r'$\mathcal{P}_{train}^{obf/basic}$', edgecolor='black', linewidth=1)
     
     # Add arrow between means
     ax.annotate('', xy=(obf_mean_x, obf_mean_y), xytext=(abf_mean_x, abf_mean_y),
@@ -389,9 +389,9 @@ def draw_sensitivity():
     width = 0.25
     
     # Create bars
-    rects1 = ax.bar(x - width, ABF_OBF_BASIC_COS_SIM, width, label=r'$\mathcal{P}_{train}^{abf}/\mathcal{P}_{train}^{obf}$', color=RED)
-    rects2 = ax.bar(x, OBF_BASIC_OBF_SCO_COS_SIM, width, label=r'$\mathcal{P}_{train}^{obf}/\mathcal{P}_{train}^{obf/sco}$', color=BLUE)
-    rects3 = ax.bar(x + width, ABF_OBF_SCO_COS_SIM, width, label=r'$\mathcal{P}_{train}^{abf}/\mathcal{P}_{train}^{obf/sco}$', color='#E6B3FF')
+    rects1 = ax.bar(x - width, ABF_OBF_BASIC_COS_SIM, width, label=r'$\mathcal{P}_{train}^{abf}$ vs $\mathcal{P}_{train}^{obf/basic}$', color=RED)
+    rects2 = ax.bar(x, OBF_BASIC_OBF_SCO_COS_SIM, width, label=r'$\mathcal{P}_{train}^{obf/basic}$ vs $\mathcal{P}_{train}^{obf/sco}$', color=BLUE)
+    rects3 = ax.bar(x + width, ABF_OBF_SCO_COS_SIM, width, label=r'$\mathcal{P}_{train}^{abf}$ vs $\mathcal{P}_{train}^{obf/sco}$', color='#E6B3FF')
     
     # Customize plot
     ax.set_ylabel('Cosine Similarity')
@@ -406,6 +406,6 @@ def draw_sensitivity():
     plt.close()
     
 if __name__ == '__main__':
-    # evaluate_obf_sco()
+    evaluate_obf_sco()
     plot_uncertainty_performance()
-    # draw_sensitivity()
+    draw_sensitivity()
