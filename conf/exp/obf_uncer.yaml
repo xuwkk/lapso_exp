@@ -4,6 +4,7 @@ max_iter: 100
 tol: 1e-3
 train_config:
   no_data: 168
+  no_sample: 20
   M_DP: 1e3  # big-M when linearizing the dispatch problem kkt
   M_RD: 1e3  # big-M when linearizing the redispatch problem kkt
   alpha: 0.0

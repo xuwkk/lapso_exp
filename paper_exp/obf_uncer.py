@@ -16,6 +16,7 @@ from paper_exp.obf_func import (data_preprocess,
                                 evaluate_forecast,
                                 evaluate_opt,
                                 worst_uncertainty,
+                                random_uncertainty,
                                 ccg
                                 )
 from functools import partial
@@ -39,6 +40,7 @@ def main(cfg: DictConfig):
     SAVING_DIR = cfg.exp.saving_dir
     MAX_ITER = cfg.exp.max_iter
     TOL = cfg.exp.tol
+    NO_SAMPLE = cfg.exp.train_config.no_sample
     os.makedirs(SAVING_DIR, exist_ok=True)
     
     assert cfg.operation.with_binary == False, "Only consider continuous case for now"
@@ -84,6 +86,13 @@ def main(cfg: DictConfig):
         load = load_total[i * NO_DATA:(i + 1) * NO_DATA]
         solar = solar_total[i * NO_DATA:(i + 1) * NO_DATA]
         
+        # Construct random load list
+        load_list = []
+        for j in range(load.shape[0]):
+            load_list.append(np.random.uniform(load[j] * (1 - BUDGET_RATIO), load[j] * (1 + BUDGET_RATIO), 
+                                               size = (NO_SAMPLE, load.shape[1])))
+        load_list = np.array(load_list)
+        
         print('==== Training the ABF model ====')
         # Train a full linear layer on the previous linear layer
         Wsolar_acc, bsolar_acc = train_abf_model(
@@ -119,30 +128,38 @@ def main(cfg: DictConfig):
         worst_uncertainty_func = partial(worst_uncertainty, load = load, solar = solar, 
                                         uc_cvxpy = uc.prob_cvxpy, rd_cvxpy = rd.prob_cvxpy, M_RD = M_RD, rd_class = rd, 
                                         budget_ratio = BUDGET_RATIO, verbose = VERBOSE)
+        random_uncertainty_func = partial(random_uncertainty, load_list = load_list, 
+                                        solar = solar, load = load,
+                                        uc_cvxpy = uc.prob_cvxpy, rd_cvxpy = rd.prob_cvxpy, M_RD = M_RD, rd_class = rd
+                                        )
         
         print('==== True Performance ====')
         cost_true = evaluate_opt_func(solar_forecast=solar)['total_cost']
         worst_cost_true = worst_uncertainty_func(solar_forecast=solar)
+        random_cost_true = random_uncertainty_func(solar_forecast=solar)
         
         print('==== ABF Performance ====')
         solar_pred_acc = evaluate_forecast(Wsolar_acc, bsolar_acc, feature, solar)
         cost_acc = evaluate_opt_func(solar_forecast=solar_pred_acc)['total_cost']
         worst_cost_acc = worst_uncertainty_func(solar_forecast=solar_pred_acc)
+        random_cost_acc = random_uncertainty_func(solar_forecast=solar_pred_acc)
         
         print('==== OBF Performance ====')  
         solar_pred_obj = evaluate_forecast(Wsolar_obj, bsolar_obj, feature, solar)
         cost_obj = evaluate_opt_func(solar_forecast=solar_pred_obj)['total_cost']
         worst_cost_obj = worst_uncertainty_func(solar_forecast=solar_pred_obj)
+        random_cost_obj = random_uncertainty_func(solar_forecast=solar_pred_obj)
         assert np.isclose(np.mean(cost_obj), cost_obj_train), "The cost of the objective-based forecast is not close to its training cost"
         
         print('==== CCG Performance ====')
         solar_pred_robust = evaluate_forecast(W_robust, b_robust, feature, solar)
         cost_robust = evaluate_opt_func(solar_forecast=solar_pred_robust)['total_cost']
         worst_cost_robust = worst_uncertainty_func(solar_forecast=solar_pred_robust)
-        
+        random_cost_robust = random_uncertainty_func(solar_forecast=solar_pred_robust)
         print('worst_cost_robust: ', np.mean(worst_cost_robust), 'converged_obj: ', converged_obj)
         assert np.isclose(np.mean(worst_cost_robust), converged_obj, atol=1e-3), "The cost of ccg does not match, may be caused by small M"
         
+        exit()
         # Helper function to concatenate data
         def concat_or_init(new_data, dict_key):
             if i == 0:

@@ -41,7 +41,7 @@ The first step is to preprocess raw data. We use the data from open-souce [TX-12
 
 Then run the following command to preprocess the data:
 ```bash
-sh preprocess_data.sh
+sh preprocess.sh
 ```
 
 This may take several minutes to complete. The data associated to each bus (there are 123 buses in total) will be saved in `data/bus_data/bus_{idx}`.

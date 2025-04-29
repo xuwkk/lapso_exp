@@ -356,6 +356,47 @@ def subproblem_individual(rd_cvxpy, rd_parameters, load_lower, load_upper, M_RD 
     # worst uncertainty, part of the upper bound of the UL objective
     return load_var.value, prob.value  # uncertainty is attained at the extreme point
 
+def random_uncertainty(solar_forecast, solar, load, load_list, uc_cvxpy, rd_cvxpy, M_RD, 
+                       rd_class
+                       ):
+    """
+    This is used for evaluation
+    For a batch of samples to solve the subproblem of the worst-case load for the RD
+    start from the forecast and DP
+    load_list: (no_data, no_sample, no_load)
+    """
+    random_total_cost_list = []
+    for i in range(load_list.shape[0]):
+        random_total_cost = []
+        # For each data
+        load_true = load[i:i+1]
+        load_true_list = load_list[i]
+        solar_true = solar[i:i+1]
+        solar_pred = solar_forecast[i:i+1]
+        
+        # UC
+        uc_parameters = {"load": load_true,"solar": solar_pred}
+        uc_sol, uc_obj = solve_problem(uc_cvxpy, uc_parameters)
+        
+        # RD
+        for j in range(load_true_list.shape[0]):
+            # For each sample
+            load_random = load_true_list[j:j+1] # [1, no_load]
+            # RD
+            rd_parameters = {"load": load_random,
+                "solar": solar_true,
+                "pg_parameter": uc_sol['pg']
+            }
+            rd_sol, rd_obj = solve_problem(rd_cvxpy, rd_parameters)
+            random_total_cost.append(rd_class.compute_total_cost(uc_sol, rd_sol))
+        
+        random_total_cost_list.append(random_total_cost)
+    
+    random_total_cost_list = np.array(random_total_cost_list)
+    print(f'Random total cost: {np.mean(random_total_cost_list)}')
+    return random_total_cost_list
+    
+
 def worst_uncertainty(solar_forecast, solar, load, uc_cvxpy, rd_cvxpy, M_RD, 
                       rd_class,
                       budget_ratio = 0.2, 
@@ -381,15 +422,12 @@ def worst_uncertainty(solar_forecast, solar, load, uc_cvxpy, rd_cvxpy, M_RD,
         uc_parameters = {"load": load_true,"solar": solar_pred}
         uc_sol, uc_obj = solve_problem(uc_cvxpy, uc_parameters)
         
-        # RD
+        # Worst-case RD
         rd_parameters = {"load": load_true,
             "solar": solar_true,
             "pg_parameter": uc_sol['pg']
         }
-        
         # rd_sol, rd_obj = solve_problem(rd_cvxpy, rd_parameters)
-        
-        # Worst-case RD
         rd_parameters = {
             "solar": solar_true.flatten(),
             "pg_parameter": uc_sol['pg'].flatten()
@@ -411,6 +449,7 @@ def worst_uncertainty(solar_forecast, solar, load, uc_cvxpy, rd_cvxpy, M_RD,
         rd_sol_verify, rd_obj_verify = solve_problem(rd_cvxpy, rd_parameters_verify)
         if np.abs(rd_obj_verify - worst_rd_obj) > 1e-3:
             print('rd_obj: ', rd_obj_verify, 'worst_rd_obj: ', worst_rd_obj)
+            print('The result is not correct, potential caused by small M')
             exit()
         # assert np.abs(rd_obj_verify - worst_rd_obj) < 1e-6, 'the result is not correct, potential caused by small M'
     
