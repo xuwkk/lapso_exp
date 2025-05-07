@@ -22,7 +22,8 @@ from paper_exp.obf_func import (add_stability_constraint, train_obj_kkt_model_re
                                 evaluate_forecast, evaluate_opt,
                                 return_grad,
                                 train_abf_model,
-                                data_preprocess)
+                                data_preprocess,
+                                return_grad_acc)
 from functools import partial
         
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
@@ -127,7 +128,7 @@ def main(cfg: DictConfig):
     # print(f"Unstable ratio daily: {len(unstable_idx_daily)/len(gscr_true_reshape)}")
     
     performance = {
-        "cost_acc": [],
+        # "cost_acc": [],
         "cost_obj": [],
         "cost_obj_sco": [],
         "grad_W_acc": [],
@@ -145,6 +146,9 @@ def main(cfg: DictConfig):
         load = load_total[i * NO_DATA:(i + 1) * NO_DATA]
         solar = solar_total[i * NO_DATA:(i + 1) * NO_DATA]
         
+        """
+        Train the Forecasters
+        """
         # print('==== Training the ABF model ====')
         # Train a full linear layer on the previous linear layer
         Wsolar_acc, bsolar_acc = train_abf_model(
@@ -171,15 +175,30 @@ def main(cfg: DictConfig):
                         reduced = False
                         )
         
-        # Compute the gradient of the total cost with respect to the forecast weight (and bias)
-        cost_acc, grad_W_acc, grad_b_acc, success_idx_acc = return_grad(Wsolar_acc, bsolar_acc, feature, load, solar, uc_ori, rd_ori, rd_class=rd)
+        """
+        Compute the gradient of training objective with respect to the **corresponding** optimal weight and bias
+        """
+        
+        # Accuracy forecaster
+        grad_W_acc, grad_b_acc = return_grad_acc(Wsolar_acc, bsolar_acc, feature, solar)
+        
+        # Objective forecaster
         cost_obj, grad_W_obj, grad_b_obj, success_idx_obj = return_grad(Wsolar_obj, bsolar_obj, feature, load, solar, uc_ori, rd_ori, rd_class=rd)
-        cost_obj_sco, grad_W_obj_sco, grad_b_obj_sco, success_idx_obj_sco = return_grad(Wsolar_obj_sco, bsolar_obj_sco, feature, load, solar, uc_ori, rd_ori, rd_class=rd)
+        
+        # Objective forecaster with SCO
+        cost_obj_sco, grad_W_obj_sco, grad_b_obj_sco, success_idx_obj_sco = return_grad(Wsolar_obj_sco, bsolar_obj_sco, 
+                                                                                feature, load, solar, uc_sco, rd_sco, rd_class=rd)
+        
+        # # Compute the gradient of the total cost with respect to the forecast weight (and bias)
+        # cost_acc, grad_W_acc, grad_b_acc, success_idx_acc = return_grad(Wsolar_acc, bsolar_acc, feature, load, solar, uc_ori, rd_ori, rd_class=rd)
+        # cost_obj, grad_W_obj, grad_b_obj, success_idx_obj = return_grad(Wsolar_obj, bsolar_obj, feature, load, solar, uc_ori, rd_ori, rd_class=rd)
+        # cost_obj_sco, grad_W_obj_sco, grad_b_obj_sco, success_idx_obj_sco = return_grad(Wsolar_obj_sco, bsolar_obj_sco, feature, load, solar, uc_ori, rd_ori, rd_class=rd)
         
         # Intersect the success index
-        success_idx = np.intersect1d(success_idx_acc, success_idx_obj, success_idx_obj_sco)
+        # success_idx = np.intersect1d(success_idx_acc, success_idx_obj, success_idx_obj_sco)
+        success_idx = np.intersect1d(success_idx_obj, success_idx_obj_sco)
         
-        performance["cost_acc"].append(cost_acc[success_idx])
+        # performance["cost_acc"].append(cost_acc[success_idx])
         performance["cost_obj"].append(cost_obj[success_idx])
         performance["cost_obj_sco"].append(cost_obj_sco[success_idx])
         
@@ -189,6 +208,9 @@ def main(cfg: DictConfig):
         performance["grad_b_obj"].append(grad_b_obj[success_idx])
         performance["grad_W_obj_sco"].append(grad_W_obj_sco[success_idx])
         performance["grad_b_obj_sco"].append(grad_b_obj_sco[success_idx])
+        
+        # if i ==2:
+        #     break
 
     # for key, value in performance.items():
     #     print(key, np.mean(value))

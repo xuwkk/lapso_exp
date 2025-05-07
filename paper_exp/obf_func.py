@@ -639,6 +639,43 @@ def ccg(feature, load, solar,
             break
     
     return Wsolar, bsolar, UB
+
+def return_grad_acc(W, b, feature, solar):
+    """
+    Find the gradient of accuracy training objective with respect to the forecast weight (and bias)
+    """
+    
+    # print("W shape: ", W.shape)
+    # print("b shape: ", b.shape)
+    # print("feature shape: ", feature.shape)
+    # print("solar shape: ", solar.shape)
+    
+    solar_true = torch.from_numpy(solar).float()
+    feature = torch.from_numpy(feature).float()
+    
+    grad_W_list = []
+    grad_b_list = []
+    
+    W = torch.from_numpy(W).float().requires_grad_(True)
+    b = torch.from_numpy(b).float().requires_grad_(True)
+    
+    for i in range(feature.shape[0]):
+        forecast = feature[i:i+1] @ W + b
+        error = torch.abs(forecast - solar_true[i:i+1])
+        loss = torch.mean(error)
+        loss.backward()
+        
+        grad_W = W.grad.flatten()
+        grad_b = b.grad.flatten()
+        
+        W.grad.zero_()
+        b.grad.zero_()
+        
+        grad_W_list.append(grad_W.detach().numpy()) 
+        grad_b_list.append(grad_b.detach().numpy())
+    
+    return np.array(grad_W_list), np.array(grad_b_list)
+        
     
 def return_grad(W, b, feature, load, solar, uc_cvxpy, rd_cvxpy, rd_class):
     """

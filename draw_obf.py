@@ -1,6 +1,7 @@
 import numpy as np
 from copy import deepcopy
 import matplotlib.pyplot as plt
+from scipy.stats import pearsonr
 
 # Set consistent style for all plots
 rc = {"font.family" : "serif", 
@@ -343,7 +344,7 @@ def draw_sensitivity():
     performance = np.load(data_dir + 'obf_sco/obf_sco_grad/performance.npy', allow_pickle=True).item()
     
     # Extract data
-    cost_acc = performance['cost_acc']
+    # cost_acc = performance['cost_acc']
     cost_obj = performance['cost_obj']
     cost_obj_sco = performance['cost_obj_sco']
     
@@ -351,37 +352,67 @@ def draw_sensitivity():
     grad_obj = np.concatenate([performance['grad_W_obj'], performance['grad_b_obj']], axis=-1)
     grad_obj_sco = np.concatenate([performance['grad_W_obj_sco'], performance['grad_b_obj_sco']], axis=-1)
     
+    grad_acc_nonzero_idx = np.where(np.linalg.norm(grad_acc, axis=-1) != 0)[0]
+    grad_obj_nonzero_idx = np.where(np.linalg.norm(grad_obj, axis=-1) != 0)[0]
+    grad_obj_sco_nonzero_idx = np.where(np.linalg.norm(grad_obj_sco, axis=-1) != 0)[0]
+    
     cos_sim_acc_obj = np.sum(grad_acc * grad_obj, axis=-1) / (np.linalg.norm(grad_acc, axis=-1) * np.linalg.norm(grad_obj, axis=-1))
     cos_sim_obj_obj_sco = np.sum(grad_obj * grad_obj_sco, axis=-1) / (np.linalg.norm(grad_obj, axis=-1) * np.linalg.norm(grad_obj_sco, axis=-1))
     cos_sim_acc_obj_sco = np.sum(grad_acc * grad_obj_sco, axis=-1) / (np.linalg.norm(grad_acc, axis=-1) * np.linalg.norm(grad_obj_sco, axis=-1))
     
     print("Overall Performance:")
-    print('ABF Cost: ', np.mean(cost_acc), 'OBF/Basic Cost: ', np.mean(cost_obj), 'OBF/SCO Cost: ', np.mean(cost_obj_sco))
-    print('ABF-OBF/Basic Cosine Similarity: ', np.mean(cos_sim_acc_obj))
-    print('OBF/Basic-OBF/SCO Cosine Similarity: ', np.mean(cos_sim_obj_obj_sco))
-    print('ABF-OBF/SCO Cosine Similarity: ', np.mean(cos_sim_acc_obj_sco))
+    # print('ABF Cost: ', np.mean(cost_acc), 'OBF/Basic Cost: ', np.mean(cost_obj), 'OBF/SCO Cost: ', np.mean(cost_obj_sco))
+    print('OBF/Basic Cost: ', np.mean(cost_obj), 'OBF/SCO Cost: ', np.mean(cost_obj_sco))
+    print('ABF-OBF/Basic Cosine Similarity: ', np.mean(cos_sim_acc_obj[grad_acc_nonzero_idx]))
+    print('OBF/Basic-OBF/SCO Cosine Similarity: ', np.mean(cos_sim_obj_obj_sco[grad_acc_nonzero_idx]))
+    print('ABF-OBF/SCO Cosine Similarity: ', np.mean(cos_sim_acc_obj_sco[grad_acc_nonzero_idx]))
     
     print("Seasonal Performance:")
     step_size = 30*24*3
     ABF_OBF_BASIC_COS_SIM = []
     OBF_BASIC_OBF_SCO_COS_SIM = []
     ABF_OBF_SCO_COS_SIM = []
+    
     for i in range(4):
         start_idx = i * step_size
-        end_idx = np.min([start_idx + step_size, len(cost_acc)])
+        end_idx = np.min([start_idx + step_size, len(cost_obj)])
         # print(f'Season {i+1}:')
         # # print('ABF Cost: ', np.mean(cost_acc[start_idx:end_idx]), 'OBF/Basic Cost: ', np.mean(cost_obj[start_idx:end_idx]), 'OBF/SCO Cost: ', np.mean(cost_obj_sco[start_idx:end_idx]))
         # print('ABF-OBF/Basic Cosine Similarity: ', np.mean(cos_sim_acc_obj[start_idx:end_idx]))
         # print('OBF/Basic-OBF/SCO Cosine Similarity: ', np.mean(cos_sim_obj_obj_sco[start_idx:end_idx]))
         # print('ABF-OBF/SCO Cosine Similarity: ', np.mean(cos_sim_acc_obj_sco[start_idx:end_idx]))
-        ABF_OBF_BASIC_COS_SIM.append(np.mean(cos_sim_acc_obj[start_idx:end_idx]))
-        OBF_BASIC_OBF_SCO_COS_SIM.append(np.mean(cos_sim_obj_obj_sco[start_idx:end_idx]))
-        ABF_OBF_SCO_COS_SIM.append(np.mean(cos_sim_acc_obj_sco[start_idx:end_idx]))
+        cos_sim_acc_obj_nonnan_idx = np.where(~np.isnan(cos_sim_acc_obj[start_idx:end_idx]))[0]
+        ABF_OBF_BASIC_COS_SIM.append(np.mean(cos_sim_acc_obj[start_idx:end_idx][cos_sim_acc_obj_nonnan_idx]))
+        OBF_BASIC_OBF_SCO_COS_SIM.append(np.mean(cos_sim_obj_obj_sco[start_idx:end_idx][cos_sim_acc_obj_nonnan_idx]))
+        ABF_OBF_SCO_COS_SIM.append(np.mean(cos_sim_acc_obj_sco[start_idx:end_idx][cos_sim_acc_obj_nonnan_idx]))
+    
+    ABF_OBF_BASIC_Pearsonr = []
+    OBF_BASIC_OBF_SCO_Pearsonr = []
+    ABF_OBF_SCO_Pearsonr = []
+    for i in range(4):
+        start_idx = i * step_size
+        end_idx = np.min([start_idx + step_size, len(cost_obj)])
+        ABF_OBF_BASIC_Pearsonr_ = []
+        OBF_BASIC_OBF_SCO_Pearsonr_ = []
+        ABF_OBF_SCO_Pearsonr_ = []
+        for j in range(start_idx, end_idx):
+            if np.linalg.norm(grad_acc[j]) != 0:
+                ABF_OBF_BASIC_Pearsonr_.append(pearsonr(grad_acc[j], grad_obj[j])[0])
+                OBF_BASIC_OBF_SCO_Pearsonr_.append(pearsonr(grad_obj[j], grad_obj_sco[j])[0])
+                ABF_OBF_SCO_Pearsonr_.append(pearsonr(grad_acc[j], grad_obj_sco[j])[0])
+        ABF_OBF_BASIC_Pearsonr.append(np.mean(ABF_OBF_BASIC_Pearsonr_))
+        OBF_BASIC_OBF_SCO_Pearsonr.append(np.mean(OBF_BASIC_OBF_SCO_Pearsonr_))
+        ABF_OBF_SCO_Pearsonr.append(np.mean(ABF_OBF_SCO_Pearsonr_))
     
     print("Average Cosine Similarity:")
     print('ABF-OBF/Basic: ', ABF_OBF_BASIC_COS_SIM)
     print('OBF/Basic-OBF/SCO: ', OBF_BASIC_OBF_SCO_COS_SIM)
     print('ABF-OBF/SCO: ', ABF_OBF_SCO_COS_SIM)
+    
+    print("Average Pearsonr:")
+    print('ABF-OBF/Basic: ', ABF_OBF_BASIC_Pearsonr)
+    print('OBF/Basic-OBF/SCO: ', OBF_BASIC_OBF_SCO_Pearsonr)
+    print('ABF-OBF/SCO: ', ABF_OBF_SCO_Pearsonr)
     
     # Plot bar plots
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -405,7 +436,28 @@ def draw_sensitivity():
     plt.savefig(data_dir + '/cosine_similarity.pdf', dpi=300, bbox_inches='tight', pad_inches=0)
     plt.close()
     
+    fig, ax = plt.subplots(figsize=(8, 4))
+    x = np.arange(4)
+    width = 0.25
+    
+    # Create bars
+    rects1 = ax.bar(x - width, ABF_OBF_BASIC_Pearsonr, width, label=r'$\mathcal{P}_{train}^{abf}$ vs $\mathcal{P}_{train}^{obf/basic}$', color=RED)
+    rects2 = ax.bar(x, OBF_BASIC_OBF_SCO_Pearsonr, width, label=r'$\mathcal{P}_{train}^{obf/basic}$ vs $\mathcal{P}_{train}^{obf/sco}$', color=BLUE)
+    rects3 = ax.bar(x + width, ABF_OBF_SCO_Pearsonr, width, label=r'$\mathcal{P}_{train}^{abf}$ vs $\mathcal{P}_{train}^{obf/sco}$', color='#E6B3FF')
+    
+    # Customize plot    
+    ax.set_ylabel('Pearsonr')
+    ax.set_xticks(x)
+    ax.set_ylim(0, 1)
+    ax.set_xticklabels(['Q1', 'Q2', 'Q3', 'Q4'])
+    ax.legend(framealpha=0.0, edgecolor='black', bbox_to_anchor=(1.02, 1), loc='upper left', ncol=1, handletextpad=0.1, columnspacing=0.5, labelspacing=0.1, 
+              handlelength=0.5)
+    ax.grid(True, linestyle='--', alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(data_dir + '/pearsonr.pdf', dpi=300, bbox_inches='tight', pad_inches=0)
+    plt.close()
+    
 if __name__ == '__main__':
-    evaluate_obf_sco()
-    plot_uncertainty_performance()
+    # evaluate_obf_sco()
+    # plot_uncertainty_performance()
     draw_sensitivity()
