@@ -1,6 +1,6 @@
 # LAPSO: Learning-Augmented Power System Operation
 
-This repository contains the code for paper "LAPSO: A Unified Optimization View for Learning-Augmented Power System Operation for Economic and Stability Scheduling" by Wangkun Xu (Imperial College London), Zhongda Chu (Tianjin University), and Fei Teng (Imperial College London). The paper is under review and more code will be released after the review process. This repository is maintained by Wangkun Xu.
+This repository contains the code for paper "LAPSO: A Unified Optimization View for Learning-Augmented Power System Operations" by Wangkun Xu (Imperial College London), Zhongda Chu (Tianjin University), and Fei Teng (Imperial College London). The paper is under review ([preprint available](https://arxiv.org/abs/2505.05203)) and more code will be released after the review process. This repository is maintained by Wangkun Xu.
 
  This work was funded by EPSRC under Grant EP/Y025946/1.
 
