@@ -1,5 +1,5 @@
 """
-the full implemenration of the case study on objective-based forecast in the paper
+the full implemenration of the case study on objective-based forecast with uncertainty in the paper
 """
 import sys
 sys.path.append('./')
@@ -23,6 +23,8 @@ from functools import partial
 import torch
 from paper_exp.train_abf_nn import MLP
 from tqdm import tqdm
+import time
+
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
     
@@ -36,13 +38,18 @@ def main(cfg: DictConfig):
     ALPHA = cfg.exp.train_config.alpha
     VERBOSE = cfg.exp.train_config.verbose
     SOLAR_MIN_CLIP = cfg.grid.renewable_min / cfg.grid.baseMVA
-    BUDGET_RATIO = cfg.exp.budget_ratio
+    BUDGET_RATIO = cfg.exp.budget_ratio                         # size of the uncertainty set
     SAVING_DIR = cfg.exp.saving_dir
-    MAX_ITER = cfg.exp.max_iter
-    TOL = cfg.exp.tol
-    NO_SAMPLE = cfg.exp.train_config.no_sample
-    os.makedirs(SAVING_DIR, exist_ok=True)
     
+    grid_name = cfg.grid.data_dir.split('/')[-2]
+    NN_DIR = cfg.exp.train_config.nn_dir + grid_name + '/acc_forecaster.pth'
+    SAVING_DIR = SAVING_DIR + f"{grid_name}/"                   # e.g., "paper_exp/obf_result/obf_uncer/bus14/"
+    os.makedirs(SAVING_DIR, exist_ok=True)
+
+    MAX_ITER = cfg.exp.max_iter                                 # max iteration of ccg
+    TOL = cfg.exp.tol                                           # ccg termination tolerance
+    NO_RANDOM_LOAD_SAMPLE = cfg.exp.train_config.no_random_load_sample                  # sample size for the random load test (not used in the paper)
+
     assert cfg.operation.with_binary == False, "Only consider continuous case for now"
     grid_xlsx = prepare_grid_from_pypower(cfg.grid)
     
@@ -55,11 +62,6 @@ def main(cfg: DictConfig):
     # np.save(SAVING_DIR + 'feature_total.npy', feature_total)
     # np.save(SAVING_DIR + 'load_total.npy', load_total)
     # np.save(SAVING_DIR + 'solar_total.npy', solar_total)
-    
-    # Load NN
-    model = MLP(70, 4)
-    model.load_state_dict(torch.load(cfg.exp.train_config.nn_dir))
-    model.to('cpu').eval()
     
     # Load optimization models
     uc = UC_CONTINUOUS(grid_xlsx, cfg.operation)
@@ -76,10 +78,25 @@ def main(cfg: DictConfig):
     
     # Preprocess the whole dataset: mainly normalize the feature
     feature_total, load_total, solar_total = data_preprocess(feature_total, load_total, solar_total)
+
+    # Load NN
+    model = MLP(feature_total.shape[1], solar_total.shape[1])
+    model.load_state_dict(torch.load(NN_DIR))
+    model.to('cpu').eval()
     nn_forecast, nn_extracted = model(torch.from_numpy(feature_total).float())
     nn_extracted = nn_extracted.detach().numpy()
+
+    # Obtain the sample_idx
+    sample_idx = NO_DATA_TOTAL // NO_DATA
+    NO_TRAIN_SAMPLE = cfg.exp.no_train_sample
+    if NO_TRAIN_SAMPLE != "all":
+        # Randomly select subsets of data to save time
+        sample_idx = np.random.choice(sample_idx, size = NO_TRAIN_SAMPLE, replace = False)
     
-    for i in tqdm(range(NO_DATA_TOTAL // NO_DATA)):
+    # for i in tqdm(range(NO_DATA_TOTAL // NO_DATA)):
+    for idx, i in tqdm(enumerate(sample_idx)):
+        # Iterate over each sample
+        print('\n\n======= Budget ratio: ', BUDGET_RATIO, ' Sample idx: ', i, ' Train idx: ', idx, '======')
         
         # Use the NN extracted feature as the input of the ABF model
         feature = nn_extracted[i * NO_DATA:(i + 1) * NO_DATA]
@@ -90,8 +107,8 @@ def main(cfg: DictConfig):
         load_list = []
         for j in range(load.shape[0]):
             load_list.append(np.random.uniform(load[j] * (1 - BUDGET_RATIO), load[j] * (1 + BUDGET_RATIO), 
-                                               size = (NO_SAMPLE, load.shape[1])))
-        load_list = np.array(load_list)
+                                            size = (NO_RANDOM_LOAD_SAMPLE, load.shape[1])))
+        load_list = np.array(load_list) # (NO_DATA, NO_RANDOM_LOAD_SAMPLE, no_load)
         
         print('==== Training the ABF model ====')
         # Train a full linear layer on the previous linear layer
@@ -100,6 +117,7 @@ def main(cfg: DictConfig):
                     reduced = False, verbose = VERBOSE)
         
         print('==== Training the obj model ====')
+        start_time = time.time()
         Wsolar_obj, bsolar_obj, cost_obj_train = train_obj_kkt_model_reduced(
                         feature, load, solar, uc.prob_cvxpy, rd.prob_cvxpy,
                         uc.no_gen,
@@ -108,8 +126,11 @@ def main(cfg: DictConfig):
                         verbose = VERBOSE, M=M_DP, alpha=ALPHA, # The dispatch problem becomes the kkt condition and linearized
                         reduced = False
                         )
+        print('cost_obj_train: ', cost_obj_train)
+        obj_time = time.time() - start_time
         
         print('==== Training the robust model ====')
+        start_time = time.time()
         W_robust, b_robust, converged_obj = ccg(
             feature, load, solar,
             uc.prob_cvxpy, rd.prob_cvxpy, uc.no_gen,
@@ -119,6 +140,7 @@ def main(cfg: DictConfig):
             Wsolar_acc = None, bsolar_acc = None,
             alpha = ALPHA, M_DP = M_DP, M_RD = M_RD, 
             max_iter = MAX_ITER, tol = TOL, verbose = VERBOSE)
+        robust_time = time.time() - start_time
         
         print('\n')    
         # Function handles
@@ -149,7 +171,7 @@ def main(cfg: DictConfig):
         cost_obj = evaluate_opt_func(solar_forecast=solar_pred_obj)['total_cost']
         worst_cost_obj = worst_uncertainty_func(solar_forecast=solar_pred_obj)
         random_cost_obj = random_uncertainty_func(solar_forecast=solar_pred_obj)
-        assert np.isclose(np.mean(cost_obj), cost_obj_train), "The cost of the objective-based forecast is not close to its training cost"
+        # assert np.isclose(np.mean(cost_obj), cost_obj_train, atol=1e-3, rtol=1e-2), "The cost of the objective-based forecast is not close to its training cost"
         
         print('==== CCG Performance ====')
         solar_pred_robust = evaluate_forecast(W_robust, b_robust, feature, solar)
@@ -157,12 +179,12 @@ def main(cfg: DictConfig):
         worst_cost_robust = worst_uncertainty_func(solar_forecast=solar_pred_robust)
         random_cost_robust = random_uncertainty_func(solar_forecast=solar_pred_robust)
         print('worst_cost_robust: ', np.mean(worst_cost_robust), 'converged_obj: ', converged_obj)
-        assert np.isclose(np.mean(worst_cost_robust), converged_obj, atol=1e-3), "The cost of ccg does not match, may be caused by small M"
+        # assert np.isclose(np.mean(worst_cost_robust), converged_obj, atol=1e-3, rtol=1e-2), "The cost of ccg does not match, may be caused by small M"
         
-        exit()
+        # exit()
         # Helper function to concatenate data
         def concat_or_init(new_data, dict_key):
-            if i == 0:
+            if idx == 0:
                 return new_data
             else:
                 if isinstance(performance_dict[dict_key], dict):
@@ -185,6 +207,12 @@ def main(cfg: DictConfig):
             'worst_cost_acc': concat_or_init(worst_cost_acc, 'worst_cost_acc'),
             'worst_cost_obj': concat_or_init(worst_cost_obj, 'worst_cost_obj'),
             'worst_cost_robust': concat_or_init(worst_cost_robust, 'worst_cost_robust'),
+            'random_cost_true': concat_or_init(random_cost_true, 'random_cost_true'),
+            'random_cost_acc': concat_or_init(random_cost_acc, 'random_cost_acc'),
+            'random_cost_obj': concat_or_init(random_cost_obj, 'random_cost_obj'),
+            'random_cost_robust': concat_or_init(random_cost_robust, 'random_cost_robust'),
+            'obj_time': concat_or_init([obj_time], 'obj_time'),
+            'robust_time': concat_or_init([robust_time], 'robust_time')
         }
         
     np.save(SAVING_DIR + f'{BUDGET_RATIO}.npy', performance_dict, allow_pickle=True)

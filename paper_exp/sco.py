@@ -1,5 +1,6 @@
 """
-A full implementation of the small-signal stability-constrained case study in the paper
+A full implementation of the small-signal stability-constrained case study 
+for the SCO in the paper
 """
 
 import sys
@@ -16,8 +17,8 @@ import cvxpy as cp
 from torch import nn
 import os
 from copy import deepcopy
-from tqdm import tqdm
 import time
+from tqdm import tqdm
 from paper_exp.sco_func import (SmallSignalStability, 
                                 train_logistic_assessor, 
                                 return_nn, 
@@ -29,7 +30,9 @@ def main(cfg: DictConfig):
     
     type = cfg.exp.type
     
+    print("=============================================================")
     print(f"==========SCO experiment model (loss) type: {type}==========")
+    print("=============================================================")
 
     np.random.seed(cfg.random_seed)
     torch.manual_seed(cfg.random_seed)
@@ -51,6 +54,16 @@ def main(cfg: DictConfig):
     start_date = cfg.exp.start_date
     end_date = cfg.exp.end_date
     assert cfg.operation.with_binary, "Consider the binary case for SCO study"
+
+    # experiment optimization setting
+    solver = cfg.exp.optimization.solver
+    solver_option = cfg.exp.optimization.option
+
+    # global optimization setting
+    # solver = cfg.optimization.solver
+    # solver_option = cfg.optimization.option
+
+    TIGHT_M_BOUND = cfg.exp.tight_M_bound   # if true, the big-M is adaptive to the solar power at each time step
     
     # Grid
     grid_xlsx = prepare_grid_from_pypower(cfg.grid)
@@ -61,6 +74,8 @@ def main(cfg: DictConfig):
     
     NO_DATA_TOTAL = load_total.shape[0]
     SOLAR_MAX = np.max(solar_total, axis=0)
+    print(f"Solar Max: {SOLAR_MAX}")
+
     np.save(saving_dir + 'load_total.npy', load_total)
     np.save(saving_dir + 'solar_total.npy', solar_total)
     
@@ -80,10 +95,10 @@ def main(cfg: DictConfig):
     load_per_day = np.sum(load_total, axis = 1)
     solar_per_day_ratio = solar_per_day / load_per_day
     print('solar_per_day_ratio min: ', 
-          np.min(solar_per_day_ratio), 
-          'solar_per_day_ratio max: ', 
-          np.max(solar_per_day_ratio), 
-          'solar_per_day_ratio mean: ', np.mean(solar_per_day_ratio))
+            np.min(solar_per_day_ratio), 
+            'solar_per_day_ratio max: ', 
+            np.max(solar_per_day_ratio), 
+            'solar_per_day_ratio mean: ', np.mean(solar_per_day_ratio))
     
     # Small signal stability analysis
     print('====== Small signal stability analysis ======')
@@ -124,14 +139,14 @@ def main(cfg: DictConfig):
         
         if os.path.exists(model_path):  
             # classifier = torch.load(model_path)
-            classifier.load_state_dict(torch.load(model_path))
+            classifier.load_state_dict(torch.load(model_path, weights_only=True))
             print("Load the pre-trained classifier. If you want to train the classifier from scratch, please delete the file: ", 
-                  model_path)
+                model_path)
         else:
             classifier = train_nn(classifier, 
-                                  torch.from_numpy(input_space).float(), 
-                                  torch.from_numpy(label).float(), 
-                                  **train_config)   
+                                torch.from_numpy(input_space).float(), 
+                                torch.from_numpy(label).float(), 
+                                  **train_config) 
             torch.save(classifier.state_dict(), os.path.join(saving_dir, f"{type}_classifier.pth"))
     
     no_param = 0
@@ -154,7 +169,8 @@ def main(cfg: DictConfig):
     cost_ori, gscr_ori, gscr_cls_ori, ug_ori, solarc_ori, solar_ori, ls_ori = evaluate_uc(
         uc.prob_cvxpy, small_signal_stability, classifier, 
         test_sample_idx, load_total, solar_total, T, 
-        threads = None, concurrent = None, seed = cfg.random_seed
+        threads = None, concurrent = None, seed = cfg.random_seed,
+        solver = solver, opt_params = solver_option
         )
     time_ori = time.time() - start_time
     print(f"Time for solving the original problem: {time_ori / test_sample_idx.shape[0]}")
@@ -176,42 +192,130 @@ def main(cfg: DictConfig):
         'time': time_ori / test_sample_idx.shape[0],
         'no_binary_var': no_binary_var_ori
     }, allow_pickle=True)
-    
     print('===Convert the original problem to the SCO problem===')
     
-    # Extract relevant variable, parameter, and constraint
-    original_prob = uc.prob_cvxpy
-    ug = original_prob.var_dict['ug']       # (T,no_gen)
-    sc = original_prob.var_dict['solarc']   # (T,no_solar)
-    constraints = original_prob.constraints
-    solar_as_parameter = original_prob.param_dict['solar']
-    # Range of the variable: 
-    # ug is bounded by 0 and 1, sc is bounded by 0 and solar_max - solar_min_clip
-    # The bound is very loose
     lower_bound = np.zeros(uc.no_gen + uc.no_solar)
-    upper_bound = np.concatenate([np.ones(uc.no_gen), SOLAR_MAX - solar_min_clip])
-    initial_bound = (lower_bound[None,:], upper_bound[None,:])  
-    
-    # For each time step, add stability constraint
-    for t in range(T):
-        cls_constraint, (z,v) = form_milp(deepcopy(classifier), initial_bound, verbose = False)
-        constraints.extend(cls_constraint)  # nn as MIL constraint
-        constraints.extend([z[-1] <= -1e-3])    # small signal stability constraint
-        constraints.extend(
-            [z[0] == cp.hstack([ug[t], solar_as_parameter[t] - sc[t]])]
-            # the constraint on sc has been included in the original problem
-            ) # link the stability constraint to the original problem (NN input is related to decision variable)
 
-    sco_prob = cp.Problem(original_prob.objective, constraints) # use the original objective
-    
-    print('===Solve the SCO problem===')
-    start_time = time.time()
-    # Solve the problem and evaluate the gscr and data gscr performance
-    cost_sco, gscr_sco, gscr_cls_sco, ug_sco, solarc_sco, solar_sco, ls_sco = evaluate_uc(
-        sco_prob, small_signal_stability, classifier, test_sample_idx, load_total, solar_total, T, 
-        threads = None, concurrent = None, seed = cfg.random_seed)    
-    time_sco = time.time() - start_time
-    print(f"Time for solving the SCO problem: {time_sco / test_sample_idx.shape[0]}")
+    if TIGHT_M_BOUND:
+        print("Using tight big-M bound for IBP.")
+        raise NotImplementedError("Tight M bound not fully tested yet")
+
+        # Range of the variable: 
+        # ug is bounded by 0 and 1, sc is bounded by 0 and solar_max per time step
+        # evaluate per sample
+
+        # record sample results
+        cost_sco, gscr_sco, gscr_cls_sco, ug_sco, solarc_sco, solar_sco, ls_sco = [], [], [], [], [], [], []
+        
+        print('===Solve the SCO problem===')
+
+        time_sco = 0
+        for sample_idx_ in tqdm(test_sample_idx):
+
+            # NOTE: regenerate the original problem for each sample to avoid any potential issue
+            uc = UC_DISCRETE(grid_xlsx, cfg.operation)
+            uc.formulate()
+            original_prob = uc.prob_cvxpy
+            ug = original_prob.var_dict['ug']       # (T,no_gen)
+            sc = original_prob.var_dict['solarc']   # (T,no_solar)
+            constraints = original_prob.constraints
+            solar_as_parameter = original_prob.param_dict['solar']
+
+            solar_sample = solar_total[sample_idx_:sample_idx_+T,:] # (T, no_solar)
+
+            # obtain the NN stability constraint for each time step each sample
+            for t in range(T):
+                # obtain the upper bound for solar at this moment (which is the default solar value)
+                max_solar = np.clip(solar_sample[t,:], a_min = solar_min_clip, a_max = None) # todo: this is not necessary
+                upper_bound = np.concatenate([np.ones(uc.no_gen), max_solar * 5])   # add a small margin
+                initial_bound = (lower_bound[None,:], upper_bound[None,:])             # add batch dim
+
+                # For each time step, add stability constraint
+                cls_constraint, (z,v) = form_milp(deepcopy(classifier), initial_bound, verbose = False)
+                constraints.extend(cls_constraint)  # nn as MIL constraint
+                constraints.extend([z[-1] <= -1e-3])    # small signal stability constraint; always consider the classification
+                constraints.extend(
+                    [z[0] == cp.hstack([ug[t], solar_as_parameter[t] - sc[t]])]
+                    # the constraint on sc has been included in the original problem
+                    ) # link the stability constraint to the original problem (NN input is related to decision variable)
+            
+            # formulate the sco problem for this sample
+            sco_prob = cp.Problem(original_prob.objective, constraints) # use the original objective
+
+            start_time = time.time()
+            # Solve the problem and evaluate the gscr and data gscr performance
+            (cost_sco_sample, gscr_sco_sample, gscr_cls_sco_sample, 
+                ug_sco_sample, solarc_sco_sample, solar_sco_sample, ls_sco_sample) = evaluate_uc(
+                    sco_prob, small_signal_stability, classifier, [sample_idx_], load_total, solar_total, T, 
+                    threads = None, concurrent = None, seed = cfg.random_seed,
+                    solver = solver, opt_params = solver_option, log_verbose = False
+                )
+            time_sco += time.time() - start_time
+            
+            cost_sco.append(cost_sco_sample[0])
+            gscr_sco.append(gscr_sco_sample[0])
+            gscr_cls_sco.append(gscr_cls_sco_sample[0])
+            ug_sco.append(ug_sco_sample[0])
+            solarc_sco.append(solarc_sco_sample[0])
+            solar_sco.append(solar_sco_sample[0])
+            ls_sco.append(ls_sco_sample[0])
+        
+        # time_sco = time.time() - start_time
+
+        # evaluate the sco performance
+        cost_sco = np.array(cost_sco)       # (no_days, )
+        gscr_sco = np.array(gscr_sco)       # (no_days, T)
+        gscr_cls_sco = np.array(gscr_cls_sco)  # (no_days, T)
+        ug_sco = np.array(ug_sco)           # (no_days, T, no_gen)
+        solarc_sco = np.array(solarc_sco)   # (no_days, T, no_solar)
+        solar_sco = np.array(solar_sco)     # (no_days, T, no_solar)
+        ls_sco = np.array(ls_sco)           # (no_days, T, no_load)
+        
+        unstable_hours_per_day_ave = np.mean(np.sum(gscr_sco <= small_signal_stability.gscr_threshold, axis = 1))
+        unstable_hours_per_day_ave_cls = np.mean(np.sum(gscr_cls_sco > 0, axis = 1))
+        no_unstable_days_ratio = np.sum(np.sum(gscr_sco <= small_signal_stability.gscr_threshold, axis = 1) > 0) / len(test_sample_idx)
+        no_unstable_days_cls_ratio = np.sum(np.sum(gscr_cls_sco > 0, axis = 1) > 0) / len(test_sample_idx)
+        
+        print(f"Average cost: {np.mean(cost_sco) * cfg.grid.baseMVA}")
+        print(f"Average unstable hours per day: {unstable_hours_per_day_ave}") 
+        print(f"Average unstable hours per day (cls): {unstable_hours_per_day_ave_cls}")
+        print(f"Number of unstable days ratio: {no_unstable_days_ratio}")  # the ratio of days with at least one unstable hour
+        print(f"Number of unstable days ratio (cls): {no_unstable_days_cls_ratio}")
+        print(f"Time for solving the SCO problem: {time_sco / test_sample_idx.shape[0]}")
+
+    else:
+        print("Using loose big-M bound for IBP.")
+        # original implementation which use universal bound for all time steps all samples: which can be very loose
+
+        # Extract relevant variable, parameter, and constraint
+        original_prob = uc.prob_cvxpy
+        ug = original_prob.var_dict['ug']       # (T,no_gen)
+        sc = original_prob.var_dict['solarc']   # (T,no_solar)
+        constraints = original_prob.constraints
+        solar_as_parameter = original_prob.param_dict['solar']
+        upper_bound = np.concatenate([np.ones(uc.no_gen), SOLAR_MAX])
+        initial_bound = (lower_bound[None,:], upper_bound[None,:])  
+        
+        # For each time step, add stability constraint
+        for t in range(T):
+            cls_constraint, (z,v) = form_milp(deepcopy(classifier), initial_bound, verbose = False)
+            constraints.extend(cls_constraint)  # nn as MIL constraint
+            constraints.extend([z[-1] <= -1e-3])    # small signal stability constraint
+            constraints.extend(
+                [z[0] == cp.hstack([ug[t], solar_as_parameter[t] - sc[t]])]
+                # the constraint on sc has been included in the original problem
+                ) # link the stability constraint to the original problem (NN input is related to decision variable)
+
+        sco_prob = cp.Problem(original_prob.objective, constraints) # use the original objective
+        
+        # Solve the problem and evaluate the gscr and data gscr performance
+        cost_sco, gscr_sco, gscr_cls_sco, ug_sco, solarc_sco, solar_sco, ls_sco = evaluate_uc(
+            sco_prob, small_signal_stability, classifier, test_sample_idx, load_total, solar_total, T, 
+            threads = None, concurrent = None, seed = cfg.random_seed,
+            solver = solver, opt_params = solver_option
+            )    
+        time_sco = time.time() - start_time
+        print(f"Time for solving the SCO problem: {time_sco / test_sample_idx.shape[0]}")
     
     no_binary_var_sco = 0
     for var in sco_prob.variables():

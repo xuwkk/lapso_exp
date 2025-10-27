@@ -33,7 +33,11 @@ def main(cfg: DictConfig):
     VERBOSE = cfg.exp.train_config.verbose
     SOLAR_MIN_CLIP = cfg.grid.renewable_min / cfg.grid.baseMVA
     SAVING_DIR = cfg.exp.saving_dir
+    grid_name = cfg.grid.data_dir.split('/')[-2]
+    NN_DIR = cfg.exp.train_config.nn_dir + grid_name + '/acc_forecaster.pth'
+    SAVING_DIR = SAVING_DIR + f"{grid_name}/"                   # e.g., "paper_exp/obf_result/obf_uncer/bus14/"
     os.makedirs(SAVING_DIR, exist_ok=True)
+    
     TYPE = cfg.exp.type
     XD = np.array(cfg.exp.xd)
     GSCR_THRESHOLD = cfg.exp.gscr_threshold
@@ -51,11 +55,6 @@ def main(cfg: DictConfig):
     # np.save(SAVING_DIR + 'feature_total.npy', feature_total)
     # np.save(SAVING_DIR + 'load_total.npy', load_total)
     # np.save(SAVING_DIR + 'solar_total.npy', solar_total)
-    
-    # Load NN
-    model = MLP(70, 4)
-    model.load_state_dict(torch.load(cfg.exp.train_config.nn_dir))
-    model.to('cpu').eval()
     
     # Load optimization models
     uc = UC_CONTINUOUS(grid_xlsx, cfg.operation)
@@ -104,6 +103,12 @@ def main(cfg: DictConfig):
     
     # Preprocess the whole dataset: mainly normalize the feature
     feature_total, load_total, solar_total = data_preprocess(feature_total, load_total, solar_total)
+
+    # Load NN
+    model = MLP(feature_total.shape[1], solar_total.shape[1])
+    model.load_state_dict(torch.load(NN_DIR))
+    model.to('cpu').eval()
+    
     nn_forecast, nn_extracted = model(torch.from_numpy(feature_total).float())
     nn_extracted = nn_extracted.detach().numpy()
     
@@ -122,6 +127,9 @@ def main(cfg: DictConfig):
     print(f"Unstable ratio daily: {len(unstable_idx_daily)/len(gscr_true_reshape)}")
     
     for i in tqdm(range(NO_DATA_TOTAL // NO_DATA)):
+    # for i in range(12,16):
+
+        # Fine tune per week
         
         # Use the NN extracted feature as the input of the ABF model
         feature = nn_extracted[i * NO_DATA:(i + 1) * NO_DATA]
@@ -154,10 +162,12 @@ def main(cfg: DictConfig):
                         reduced = False
                         )
         
+        # helper function for Pbasic uc and rd
         evaluate_opt_ori = partial(evaluate_opt, solar = solar, load = load, rd_class = rd,
                                 uc_cvxpy = uc_ori, rd_cvxpy = rd_ori,
                                 W_assessor = W_assessor, b_assessor = b_assessor,
                                 small_signal_stability = small_signal_stability)
+        # helper function for Psco uc and rd
         evaluate_opt_sco = partial(evaluate_opt, solar = solar, load = load, rd_class = rd,
                                 uc_cvxpy = uc_sco, rd_cvxpy = rd_sco,
                                 W_assessor = W_assessor, b_assessor = b_assessor,
@@ -184,7 +194,7 @@ def main(cfg: DictConfig):
         performance_obj_ori = evaluate_opt_ori(solar_forecast = forecast_obj)
         # The assert is used to test if the KKT in the training process is correct,
         # Exception is raised due to the big-M method sets small M potentially
-        assert np.isclose(np.mean(performance_obj_ori['total_cost']), cost_obj_train), "The cost of the objective-based forecast is not close to its training cost"
+        assert np.isclose(np.mean(performance_obj_ori['total_cost']), cost_obj_train), f"The cost of the objective-based forecast is not close to its training cost: {np.mean(performance_obj_ori['total_cost'])} vs {cost_obj_train}"
         print('with stability constraint: ')
         performance_obj_sco = evaluate_opt_sco(solar_forecast = forecast_obj)
 

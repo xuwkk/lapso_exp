@@ -3,7 +3,7 @@ config_xlsx_path: case14.xlsx
 data_dir: ./data/bus14/
 rescale_load: True
 renewable_min: 1
-renewable_load_ratio_max: 1.0
+renewable_load_ratio_max: 1.0  # the maximum ratio between the aggregated renewable generation and the aggregated load per hour
 baseMVA: 100
 rescale_line_limit:
   force_new: true
@@ -39,7 +39,7 @@ extra_config:
     RAMP_SHUTDOWN:
       format: value 
       value: [80,70,50,60,75]
-    RAMP_UP_RD:
+    RAMP_UP_RD: # ramp up limit at the redispatch stage
       format: value 
       value: [16,14,10,12,15]
     RAMP_DOWN_RD:
@@ -74,25 +74,25 @@ extra_config:
     FIRST:
       format: value 
       value: [3,1,6,4,5]
-    ZERO:
+    ZERO: # generator fixed cost
       format: value 
       value: [20,30,40,18,48]
-    STORAGE:
+    STORAGE: # to charge the overgeneration
       format: value 
       value: [20.0,15.0,40.0,30.0,35.0]
-    RD_UP:
+    RD_UP:   # redispatch stage generator ramp up cost: more costly
       format: value 
       value: [26,20,24,16,20]
-    RD_DOWN:
+    RD_DOWN: # less costly
       format: value 
       value: [10,2,9,6,8]
   solar:
     INDEX:
       format: value 
       value: [5,11,13,14]
-    CAPACITY_RATIO:
+    CAPACITY_RATIO: # capacity ratio to the aggregated maximum load
       format: value 
       value: [0.1,0.06,0.05,0.15]
-    CURTAIL:
+    CURTAIL:  # cost for renewable curtailment
       format: value 
       value: [110.0,120.0,130.0,80.0]

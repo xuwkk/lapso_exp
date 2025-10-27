@@ -1,3 +1,6 @@
+"""
+Show all experiment results for the SCO case-study on bus-14 system
+"""
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -62,7 +65,7 @@ Evaluate the results
 # Load results from different models
 sco_dir = "paper_exp/sco_result/"
 models = {
-    # model dir, 
+    # model dir and name
     'linear_bce': ('bce_ori', 'bce_sco'),
     'linear_cbce': ('cbce_ori', 'cbce_sco'), 
     'nn_small': ('small_ori', 'small_sco'),
@@ -90,7 +93,7 @@ def evaluate(ori, sco, start_day = 0, end_day = -1):
         if isinstance(value, np.ndarray):
             ori_reduced[key] = value[start_day:end_day]
         else:
-                ori_reduced[key] = value
+            ori_reduced[key] = value
                 
     for key, value in sco.items():
         if isinstance(value, np.ndarray):
@@ -108,11 +111,11 @@ def evaluate(ori, sco, start_day = 0, end_day = -1):
     # print(f"GSCR shape: {ori['gscr_cls'].shape}")  # 365*24
     
     # Cost comparison
-    print("Average Cost:")
+    print("Average Cost $:")
     print(f"Original: {np.round(np.mean(ori['cost']) * 100, 2)}, SCO: {np.round(np.mean(sco['cost']) * 100, 2)}")
     
     # stable hourly
-    ori_cls_stable_idx_hour = np.where(ori['gscr_cls'].flatten() <= 0)[0]
+    ori_cls_stable_idx_hour = np.where(ori['gscr_cls'].flatten() <= 0)[0] # NOTE: for classification only
     sco_cls_stable_idx_hour = np.where(sco['gscr_cls'].flatten() <= 0)[0]
     ori_gscr_stable_idx_hour = np.where(ori['gscr'].flatten() >= 2.5)[0]
     sco_gscr_stable_idx_hour = np.where(sco['gscr'].flatten() >= 2.5)[0]
@@ -138,8 +141,8 @@ def evaluate(ori, sco, start_day = 0, end_day = -1):
     # print("UR-CLS-HOUR (%): ")
     # print(f"Original: {np.round(len(ori_cls_unstable_idx_hour)/no_hour * 100, 2)}, SCO: {np.round(len(sco_cls_unstable_idx_hour)/no_hour * 100, 2)}")
     
-    # print("UR-GSCR-HOUR (%): ")
-    # print(f"Original: {np.round(len(ori_gscr_unstable_idx_hour)/no_hour * 100, 2)}, SCO: {np.round(len(sco_gscr_unstable_idx_hour)/no_hour * 100, 2)}")
+    print("UR-GSCR-HOUR (%): ")
+    print(f"Original: {np.round(len(ori_gscr_unstable_idx_hour)/no_hour * 100, 2)}, SCO: {np.round(len(sco_gscr_unstable_idx_hour)/no_hour * 100, 2)}")
     
     # print("UR-CLS-DAY (%): ")
     # print(f"Original: {np.round(len(ori_cls_unstable_idx_day)/no_day * 100, 2)}, SCO: {np.round(len(sco_cls_unstable_idx_day)/no_day * 100, 2)}")
@@ -147,9 +150,9 @@ def evaluate(ori, sco, start_day = 0, end_day = -1):
     print("UR-GSCR-DAY (%): ")
     print(f"Original: {np.round(len(ori_gscr_unstable_idx_day)/no_day * 100, 2)}, SCO: {np.round(len(sco_gscr_unstable_idx_day)/no_day * 100, 2)}")
     
-    # Stablize rate: unstable -> stable
+    # Stablize rate: unstable of original -> stable of SCO
     SR_DAY = len(np.intersect1d(ori_gscr_unstable_idx_day, sco_gscr_stable_idx_day)) / len(ori_gscr_unstable_idx_day)
-    # Stablize rate: stable -> unstable
+    # Destablize rate: stable -> unstable
     DR_DAY = len(np.intersect1d(ori_gscr_stable_idx_day, sco_gscr_unstable_idx_day)) / len(ori_gscr_stable_idx_day)
     
     # print(f"SR-DAY: {np.round(SR_DAY * 100, 4)}, DR-DAY: {np.round(DR_DAY * 100, 4)}")
@@ -159,7 +162,7 @@ def evaluate(ori, sco, start_day = 0, end_day = -1):
     
     print(f"SR-HOUR: {np.round(SR_HOUR * 100, 4)}, DR-HOUR: {np.round(DR_HOUR * 100, 4)}")
     
-    # Overreaction, gscr stable -> cls unstable
+    # Overreaction, on ori: gscr stable -> cls unstable
     OR_DAY = len(np.intersect1d(ori_gscr_stable_idx_day, ori_cls_unstable_idx_day)) / len(ori_gscr_stable_idx_day)
     OR_HOUR = len(np.intersect1d(ori_gscr_stable_idx_hour, ori_cls_unstable_idx_hour)) / len(ori_gscr_stable_idx_hour)
 
@@ -175,7 +178,12 @@ def evaluate(ori, sco, start_day = 0, end_day = -1):
     
     return OR_HOUR
 
-# Evaluate all models
+"""
+Evaluate all models
+Plot OR, Cost, Time, No. of Binary against different models
+"""
+
+# Record OR
 start_day = 0
 end_day = -1
 for model_name, (ori_name, sco_name) in models.items():
@@ -202,7 +210,7 @@ Plot cost vs OR
 # Cost vs OR
 fig, ax1 = plt.subplots(figsize=(8, 4), dpi=300)
 
-model_name_list = ["LR", "cLR", r"$NN_2^{12}$", r"$NN_2^{111}$", r"$NN_3^{161}$", r"$NN_3^{221}$"]
+model_name_list = ["LgR", "cLgR", r"$NN_2^{12}$", r"$NN_2^{111}$", r"$NN_3^{161}$", r"$NN_3^{221}$"]
 
 # Plot OR on left y-axis with markers and grid
 ax1.plot(model_name_list, np.array(OR), color=BLUE, marker='o', linewidth=2, markersize=8, label='OR')
@@ -269,15 +277,16 @@ plt.show()
 Plot daily results
 """
 model_name = 'large'
-ori_ug_hourly_total = results[model_name + '_ori']['ug'].sum(axis=-1)
+ori_ug_hourly_total = results[model_name + '_ori']['ug'].sum(axis=-1) # (365, 24)
 sco_ug_hourly_total = results[model_name + '_sco']['ug'].sum(axis=-1)
 no_day = len(ori_ug_hourly_total)
 for day_idx in range(no_day):
     
+    # Only plot days with 5 online generators in SCO
     if not np.any(sco_ug_hourly_total[day_idx] == 5):
         continue
     
-    solar_hourly_total = results[model_name + '_ori']['solar'].sum(axis=-1)
+    solar_hourly_total = results[model_name + '_ori']['solar'].sum(axis=-1) # (365, 24)
     ori_solar_hourly_total = results[model_name + '_ori']['solar'].sum(axis=-1) - results[model_name + '_ori']['solarc'].sum(axis=-1)
     # ori_solar_hourly_total = results[model_name + '_ori']['solar'].sum(axis=-1)
     sco_solar_hourly_total = results[model_name + '_sco']['solar'].sum(axis=-1) - results[model_name + '_sco']['solarc'].sum(axis=-1)
@@ -294,7 +303,13 @@ for day_idx in range(no_day):
     ax1.set_ylabel('NO. Online Gen.', fontweight='normal', color='black')
     ax1.tick_params(axis='y', labelcolor='black')
     ax1.grid(True, linestyle='--', alpha=0.7)
-    ax1.set_xticks(np.arange(0, 24, 4))  # Show every 4 hours
+    # Tick positions: 0, 4, 8, ..., 24
+    ticks = np.arange(0, 25, 4)
+    ax1.set_xticks(ticks)
+    # Labels: 1, 5, 9, 13, ...
+    labels = ticks + 1
+    ax1.set_xticklabels(labels)
+    
     ax1.yaxis.set_major_locator(plt.MaxNLocator(integer=True))
 
     # Plot solar curtailment on right y-axis

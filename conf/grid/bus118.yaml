@@ -1,0 +1,94 @@
+pypower_case_name: case118
+config_xlsx_path: case118.xlsx
+data_dir: ./data/bus118/
+rescale_load: True
+renewable_min: 1
+renewable_load_ratio_max: 1.0  # the maximum ratio between the aggregated renewable generation and the aggregated load per hour
+baseMVA: 100
+random_ratio: 0.1  # randomly alter the grid config within +/- 10%
+rescale_line_limit:
+  force_new: true
+  min_pfmax: 10
+  scale_factor: 0.1 # randomly alter the final line limit from 90% to 110%
+extra_config:
+  bus:
+    BS: 
+      format: value 
+      value: [0.0]
+    GS:
+      format: value
+      value: [0.0]
+    LOAD_SHED:
+      format: ratio
+      value: [30]
+  gen:
+    # with respect to the pmax in the pypower case file
+    PMIN:
+      format: ratio 
+      value: [0.1]
+    RAMP_UP:
+      format: ratio 
+      value: [0.25]
+    RAMP_DOWN:
+      format: ratio 
+      value: [0.5]
+    RAMP_STARTUP:
+      format: ratio 
+      value: [0.5]
+    RAMP_SHUTDOWN:
+      format: ratio 
+      value: [0.5]
+    RAMP_UP_RD: # ramp up limit at the redispatch stage
+      format: ratio 
+      value: [0.1]
+    RAMP_DOWN_RD:
+      format: ratio 
+      value: [0.2]
+    MIN_ON_TIME:
+      format: value
+      value: [3]
+    MIN_OFF_TIME:
+      format: value
+      value: [2]
+  branch:
+    TAP:
+      format: value 
+      value: [0.0]
+    SHIFT:
+      format: value 
+      value: [0.0]
+    BR_B:
+      format: value 
+      value: [0.0]
+  gencost:
+    STARTUP:
+      format: ratio 
+      value: [18]
+    SHUTDOWN:
+      format: ratio 
+      value: [5]
+    SECOND:
+      format: ratio 
+      value: [0.0]
+    ZERO: # generator fixed cost
+      format: ratio 
+      value: [10.0]
+    STORAGE: # to charge the overgeneration
+      format: ratio 
+      value: [10.0]
+    RD_UP:   # redispatch stage generator ramp up cost: more costly
+      format: ratio 
+      value: [13.0]
+    RD_DOWN: # less costly
+      format: ratio 
+      value: [5.0]
+  solar:
+    INDEX:
+      format: ratio # with respect to the number of buses 
+      value: [0.2]
+    CAPACITY_RATIO:
+      format: ratio 
+      value: [0.3] # aggregated renewable generation / aggregated load at each hour
+    CURTAIL:  # cost for renewable curtailment
+      format: ratio 
+      value: [10]

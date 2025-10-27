@@ -1,13 +1,25 @@
 defaults:
   - grid: bus14
   - operation: bus14_discrete
-  - exp: obf
+  - exp: obf_basic
   - _self_
-random_seed: 123
-force_new_data: false
-force_new_grid: false
-optimization:
-  solver: "gurobi"
+random_seed: 123          # global random seed
+force_new_data: false     # whether to force generating new data
+force_new_grid: false     # whether to force generating new grid
+optimization:             # global definition of optimization, each experiment can override it
+  solver: "GUROBI" 
   option:
     warm_start: true
     verbose: false
+    MIPGap: 1e-3
+    MIPGapAbs: 1e-3
+    TimeLimit: 3600
+
+# optimization:  # global definition of optimization
+#   solver: "MOSEK"  # default solver
+#   option:
+#     warm_start: true
+#     verbose: false
+#     MSK_DPAR_MIO_TOL_ABS_GAP: 0.001 # use C api: https://www.cvxpy.org/tutorial/solvers/index.html
+#     MSK_DPAR_MIO_TOL_REL_GAP: 0.001
+#     optimizer_max_time: 600  # in seconds

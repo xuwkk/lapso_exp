@@ -20,9 +20,10 @@ YELLOW = '#FFFF44'
 
 data_dir = 'paper_exp/obf_result'
 
-def evaluate_obf_sco():
-    performance_dict = np.load(data_dir + '/obf_sco/performance_dict.npy', allow_pickle=True).item()
+def evaluate_obf_sco(grid_name):
+    performance_dict = np.load(data_dir + f'/obf_sco/{grid_name}/performance_dict.npy', allow_pickle=True).item()
     
+    print("====== Basic Information ======")
     print("All keys in the performance dict...")
     print(performance_dict.keys())
     print("Shape of performance_true_ori...")
@@ -32,13 +33,14 @@ def evaluate_obf_sco():
     total_number = performance_dict['solar'].shape[0]
     print(f'total number of data: {total_number}')
 
-    """
-    Forecast method list: [true, acc, obj,obj_sco]
-    start_idx: start index of the data (in our basis)
-    end_idx: end index of the data (in hour basis) = -1 means all data
-    """
     def evaluate(key, start_idx, end_idx, verbose=False):
-        # key means the forecast method
+        """
+        Forecast method list: [true, acc, obj,obj_sco] (key means the forecast method)
+        Evaluate on both Pbasic (ori) and Pinf^sco (sco)
+        start_idx: start index of the data (in our basis)
+        end_idx: end index of the data (in hour basis) = -1 means all data
+        """
+
         load_true = performance_dict[f'load'][start_idx:end_idx]
         solar_true = performance_dict[f'solar'][start_idx:end_idx]
         solar_forecast = performance_dict[f'{key}_forecast'][start_idx:end_idx]
@@ -74,13 +76,14 @@ def evaluate_obf_sco():
         rd_gscr_ori = performance_dict[f"performance_{key}_ori"]["rd_gscr"][start_idx:end_idx]
         rd_gscr_sco = performance_dict[f"performance_{key}_sco"]["rd_gscr"][start_idx:end_idx]
         # Daily
-        uc_gscr_ori_by_day = uc_gscr_ori.reshape(-1, 24)  # into daily
+        uc_gscr_ori_by_day = uc_gscr_ori.reshape(-1, 24)  # into daily (days, 24)
         uc_gscr_sco_by_day = uc_gscr_sco.reshape(-1, 24)
         rd_gscr_ori_by_day = rd_gscr_ori.reshape(-1, 24)
         rd_gscr_sco_by_day = rd_gscr_sco.reshape(-1, 24)
         
         no_hour, no_day = uc_gscr_ori.shape[0], uc_gscr_ori_by_day.shape[0]
         
+        # Unstable rate
         uc_ur_ori_hourly = np.sum(uc_gscr_ori < 2.5) / no_hour * 100
         uc_ur_ori_daily = np.sum(np.sum(uc_gscr_ori_by_day < 2.5, axis=-1) > 0) / no_day * 100
         
@@ -122,39 +125,67 @@ def evaluate_obf_sco():
         
         return summary_dict
 
-    """
-    Total performance
-    """
-    print(f'===============>Evaluating total performance...')
+    # Total performance
     total_performance = {}
     for key in ['true', 'acc', 'obj', 'obj_sco']:
-        print(f'===============>Evaluating {key}...')
+        print(f'====== Evaluating {key} ======')
         total_performance[key] = evaluate(key, 0, total_number, verbose=True)
     
-    """
-    Draw the scatter plots
-    """
+    # Per sample cost performance
+    print("====== Per Sample Cost Performance against True ======")
+    abf_cost_ori = total_performance['acc']['cost_ori']
+    abf_cost_sco = total_performance['acc']['cost_sco']
+    obf_cost_ori = total_performance['obj']['cost_ori']
+    obf_cost_sco = total_performance['obj']['cost_sco']
+    obf_sco_cost_ori = total_performance['obj_sco']['cost_ori']
+    obf_sco_cost_sco = total_performance['obj_sco']['cost_sco']
+    true_cost_ori = total_performance['true']['cost_ori']
+    true_cost_sco = total_performance['true']['cost_sco']
+
+    abf_cost_ori_ratio = abf_cost_ori / true_cost_ori
+    abf_cost_sco_ratio = abf_cost_sco / true_cost_sco
+    obf_cost_ori_ratio = obf_cost_ori / true_cost_ori
+    obf_cost_sco_ratio = obf_cost_sco / true_cost_sco
+    obf_sco_cost_ori_ratio = obf_sco_cost_ori / true_cost_ori
+    obf_sco_cost_sco_ratio = obf_sco_cost_sco / true_cost_sco
+
+    # Print out statistics
+    print('ABF Cost Ori Ratio: Mean {:.4f}, Std {:.4f}, Min {:.4f}, Max {:.4f}'.format(
+        np.mean(abf_cost_ori_ratio), np.std(abf_cost_ori_ratio), np.min(abf_cost_ori_ratio), np.max(abf_cost_ori_ratio)))
+    print('ABF Cost SCO Ratio: Mean {:.4f}, Std {:.4f}, Min {:.4f}, Max {:.4f}'.format(
+        np.mean(abf_cost_sco_ratio), np.std(abf_cost_sco_ratio), np.min(abf_cost_sco_ratio), np.max(abf_cost_sco_ratio)))
+    print('OBF Cost Ori Ratio: Mean {:.4f}, Std {:.4f}, Min {:.4f}, Max {:.4f}'.format(
+        np.mean(obf_cost_ori_ratio), np.std(obf_cost_ori_ratio), np.min(obf_cost_ori_ratio), np.max(obf_cost_ori_ratio)))
+    print('OBF Cost SCO Ratio: Mean {:.4f}, Std {:.4f}, Min {:.4f}, Max {:.4f}'.format(
+        np.mean(obf_cost_sco_ratio), np.std(obf_cost_sco_ratio), np.min(obf_cost_sco_ratio), np.max(obf_cost_sco_ratio)))
+    print('OBF/SCO Cost Ori Ratio: Mean {:.4f}, Std {:.4f}, Min {:.4f}, Max {:.4f}'.format(
+        np.mean(obf_sco_cost_ori_ratio), np.std(obf_sco_cost_ori_ratio), np.min(obf_sco_cost_ori_ratio), np.max(obf_sco_cost_ori_ratio)))
+    print('OBF/SCO Cost SCO Ratio: Mean {:.4f}, Std {:.4f}, Min {:.4f}, Max {:.4f}'.format(
+        np.mean(obf_sco_cost_sco_ratio), np.std(obf_sco_cost_sco_ratio), np.min(obf_sco_cost_sco_ratio), np.max(obf_sco_cost_sco_ratio)))
+
+    # Draw the scatter plots
+    # On obf/basic: cost vs solar forecast error (obf tends to under forecast)
     # Calculate net load differences and costs
-    abf_net_load = np.sum(total_performance['acc']['solar_true'], axis=-1) - np.sum(total_performance['acc']['solar_forecast'], axis=-1)
+    abf_forecast_err = np.sum(total_performance['acc']['solar_true'], axis=-1) - np.sum(total_performance['acc']['solar_forecast'], axis=-1)
     abf_cost = total_performance['acc']['cost_ori']
-    obf_net_load = np.sum(total_performance['obj']['solar_true'], axis=-1) - np.sum(total_performance['obj']['solar_forecast'], axis=-1)
+    obf_forecast_err = np.sum(total_performance['obj']['solar_true'], axis=-1) - np.sum(total_performance['obj']['solar_forecast'], axis=-1)
     obf_cost = total_performance['obj']['cost_ori']
     
     # Create scatter plot
     fig, ax = plt.subplots(figsize=(8, 4))
-    start_idx_ = 24*7*30
+    start_idx_ = 24*7*30  # for a single summer week
     end_idx_ = 24*7*31
     
     # Plot scatter points
-    ax.scatter(abf_net_load[start_idx_:end_idx_], abf_cost[start_idx_:end_idx_]/100, 
+    ax.scatter(abf_forecast_err[start_idx_:end_idx_], abf_cost[start_idx_:end_idx_]/100, 
               label=r'$\mathcal{P}_{train}^{abf}$', color=RED, alpha=0.6, s=50)
-    ax.scatter(obf_net_load[start_idx_:end_idx_], obf_cost[start_idx_:end_idx_]/100, 
+    ax.scatter(obf_forecast_err[start_idx_:end_idx_], obf_cost[start_idx_:end_idx_]/100, 
               label=r'$\mathcal{P}_{train}^{obf/basic}$', color=BLUE, alpha=0.6, s=50)
     
     # Add mean points
-    abf_mean_x = np.mean(abf_net_load[start_idx_:end_idx_])
+    abf_mean_x = np.mean(abf_forecast_err[start_idx_:end_idx_])
     abf_mean_y = np.mean(abf_cost[start_idx_:end_idx_]/100)
-    obf_mean_x = np.mean(obf_net_load[start_idx_:end_idx_])
+    obf_mean_x = np.mean(obf_forecast_err[start_idx_:end_idx_])
     obf_mean_y = np.mean(obf_cost[start_idx_:end_idx_]/100)
     
     ax.scatter(abf_mean_x, abf_mean_y, color=RED, marker='*', s=400, 
@@ -175,12 +206,10 @@ def evaluate_obf_sco():
     ax.legend(framealpha=0.0, edgecolor='black', loc='lower left', ncol=1, handletextpad=0.1, columnspacing=0.5, labelspacing=0.1)
     
     plt.tight_layout()
-    plt.savefig(data_dir + '/scatter_plot.pdf', dpi=600, bbox_inches='tight', pad_inches=0.1)
+    plt.savefig(data_dir + f'/obf_sco/{grid_name}/scatter_plot.pdf', dpi=600, bbox_inches='tight', pad_inches=0.1)
     plt.close()
     
-    """
-    Plot seasonal performance
-    """
+    # Plot seasonal performance
     # Each method build a dictionary, Each entry is a list of seasonal performance
     true_performance = {
         'solar_ave': [], 'load_ave': [],
@@ -217,7 +246,8 @@ def evaluate_obf_sco():
         for k in all_performance[key]:
             all_performance[key][k] = np.array(all_performance[key][k])
             
-    # Calculate relative cost differences
+    # Calculate relative cost differences against the true solar performance, with and without stability constraints
+    # To assess if the performance is consistent across seasons (higher vs lower solar generation)
     acc_ori_diff = (all_performance['acc']['cost_ori_mean'] - all_performance['true']['cost_ori_mean'])/all_performance['true']['cost_ori_mean']
     acc_sco_diff = (all_performance['acc']['cost_sco_mean'] - all_performance['true']['cost_sco_mean'])/all_performance['true']['cost_sco_mean']
     obj_ori_diff = (all_performance['obj']['cost_ori_mean'] - all_performance['true']['cost_ori_mean'])/all_performance['true']['cost_ori_mean']
@@ -227,8 +257,8 @@ def evaluate_obf_sco():
     solar = all_performance['true']['solar_ave']
     load = all_performance['true']['load_ave']
 
-    # Create figure for original case
-    fig, ax1 = plt.subplots(figsize=(8, 4))
+    # Create figure for evaluating original case
+    fig, ax1 = plt.subplots(figsize=(4, 4))
     x = np.arange(4)
     width = 0.2
 
@@ -243,14 +273,13 @@ def evaluate_obf_sco():
     ax1.set_xticks(x)
     ax1.set_xticklabels(['Q1', 'Q2', 'Q3', 'Q4'])
     ax1.grid(True, alpha=0.2, linestyle='--')
-    ax1.legend(framealpha=0.0, edgecolor='black', loc='upper right', ncol=1, handletextpad=0.1, columnspacing=0.5, labelspacing=0.1)
     
     plt.tight_layout()
-    plt.savefig(data_dir + '/seasonal_performance_ori.pdf', dpi=300, bbox_inches='tight', pad_inches=0)
+    plt.savefig(data_dir + f'/obf_sco/{grid_name}/seasonal_performance_ori.pdf', dpi=300, bbox_inches='tight', pad_inches=0)
     plt.close()
 
-    # Create figure for SCO case
-    fig, ax1 = plt.subplots(figsize=(8, 4))
+    # Create figure for evaluating SCO case
+    fig, ax1 = plt.subplots(figsize=(4, 4))
     x = np.arange(4)
     width = 0.2
 
@@ -261,27 +290,32 @@ def evaluate_obf_sco():
 
     # Customize plot
     ax1.set_ylabel('Rel. Cost Diff (%)')
-    ax1.set_ylim(0, 10)
+    ax1.set_ylim(0, 15)
     ax1.set_xticks(x)
     ax1.set_xticklabels(['Q1', 'Q2', 'Q3', 'Q4'])
     ax1.grid(True, alpha=0.2, linestyle='--')
+    ax1.legend(framealpha=0.0, edgecolor='black', loc='upper right', ncol=1, handletextpad=0.1, columnspacing=0.5, labelspacing=0.1)
     
     plt.tight_layout()
-    plt.savefig(data_dir + '/seasonal_performance_sco.pdf', dpi=300, bbox_inches='tight', pad_inches=0)
+    plt.savefig(data_dir + f'/obf_sco/{grid_name}/seasonal_performance_sco.pdf', dpi=300, bbox_inches='tight', pad_inches=0)
     plt.close()
     
-def plot_uncertainty_performance():
+def plot_uncertainty_performance(grid_name):
     # Load data
-    data_dir = 'paper_exp/obf_result/'
+    data_dir = f'paper_exp/obf_result/obf_uncer/{grid_name}/' 
     # uncertainty_budget = [0.01, 0.03, 0.05, 0.07]
     # budget_percentage = ['1%', '3%', '5%', '7%']
 
-    uncertainty_budget = [0.03, 0.05, 0.07]
-    budget_percentage = ['3%', '5%', '7%']
+    if grid_name == 'bus14':
+        uncertainty_budget = [0.03, 0.05, 0.07]
+        budget_percentage = ['3%', '5%', '7%']
+    else:
+        uncertainty_budget = [0.05]
+        budget_percentage = ['5%']
 
     for idx, budget in enumerate(uncertainty_budget):
         # Load data for each budget
-        performance_dict = np.load(data_dir + f'obf_uncer/{budget}.npy', allow_pickle=True).item()
+        performance_dict = np.load(data_dir + f'{budget}.npy', allow_pickle=True).item()
         
         cost_true = performance_dict['cost_true'] * 100
         cost_abf = performance_dict['cost_acc'] * 100 
@@ -301,6 +335,15 @@ def plot_uncertainty_performance():
         original_costs = [np.mean(cost_true), np.mean(cost_abf), np.mean(cost_obf), np.mean(cost_obf_robust)]
         worst_costs = [np.mean(worst_cost_true), np.mean(worst_cost_abf), np.mean(worst_cost_obf), np.mean(worst_cost_obf_robust)]
 
+        print(f'=== Uncertainty Budget: {budget} ===')
+        print('Original Costs: ', original_costs)
+        print('Worst-case Costs: ', worst_costs)
+
+        obf_time = performance_dict['obj_time']
+        ccg_time = performance_dict['robust_time']
+
+        print('OBF Time: ', np.mean(obf_time), 'CCG Time: ', np.mean(ccg_time))
+
         x = np.arange(len(labels))
         width = 0.35
 
@@ -308,12 +351,18 @@ def plot_uncertainty_performance():
         rects1 = ax.bar(x, np.array(worst_costs) / 100, width, label='Worst-case Cost', color=RED)
         rects2 = ax.bar(x, np.array(original_costs) / 100, width, label='Original Cost', color=BLUE)
 
+        # Set up ylim
+        if grid_name == 'bus14':
+            ylim = 12
+        else:
+            ylim = np.max(worst_costs) / 100 * 1.6
+
         # Customize plot
         ax.set_ylabel(r'PSO Cost ($\times10^2$£)')
         # ax.set_title(f'Uncertainty Budget = {budget_percentage[idx]}')
         ax.set_xticks(x)
         ax.set_xticklabels(labels)
-        ax.set_ylim(0, 12)
+        ax.set_ylim(0, ylim)
         ax.grid(True, alpha=0.3)
         
         if idx == 0:
@@ -327,21 +376,21 @@ def plot_uncertainty_performance():
                         xy=(rect.get_x() + rect.get_width() / 2, height),
                         xytext=(0, offset),
                         textcoords="offset points",
-                        ha='center', va='bottom', fontsize=12)
+                        ha='center', va='bottom', fontsize=18)
 
         autolabel(rects1, offset=5)
         autolabel(rects2, offset=-1)
 
         plt.tight_layout()
-        plt.savefig(data_dir + f'/uncertainty_performance_{idx}.pdf', dpi=300, bbox_inches='tight', pad_inches=0)
+        plt.savefig(data_dir + f'/{grid_name}_uncertainty_performance_{idx}.pdf', dpi=300, bbox_inches='tight', pad_inches=0)
         plt.close()
 
-def draw_sensitivity():
+def draw_sensitivity(grid_name):
     """
     Sensitivity analysis for ABF, OBF/Basic, OBF/SCO
     """
     data_dir = 'paper_exp/obf_result/'
-    performance = np.load(data_dir + 'obf_sco/obf_sco_grad/performance.npy', allow_pickle=True).item()
+    performance = np.load(data_dir + f'obf_sco/obf_sco_grad/{grid_name}/performance.npy', allow_pickle=True).item()
     
     # Extract data
     # cost_acc = performance['cost_acc']
@@ -458,6 +507,12 @@ def draw_sensitivity():
     plt.close()
     
 if __name__ == '__main__':
-    # evaluate_obf_sco()
-    # plot_uncertainty_performance()
-    draw_sensitivity()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--grid', type=str, default='bus14', help='Grid name: bus14')
+    args = parser.parse_args()
+    grid_name = args.grid
+
+    # evaluate_obf_sco(grid_name=grid_name)
+    plot_uncertainty_performance(grid_name=grid_name)
+    # draw_sensitivity(grid_name=grid_name)

@@ -2,9 +2,6 @@
 Sensitivity analysis of ABF, OBF/Basic, and SCO
 """
 
-"""
-Objective-based forecast based on the SCO model
-"""
 import sys
 sys.path.append('./')
 import hydra
@@ -39,7 +36,11 @@ def main(cfg: DictConfig):
     VERBOSE = cfg.exp.train_config.verbose
     SOLAR_MIN_CLIP = cfg.grid.renewable_min / cfg.grid.baseMVA
     SAVING_DIR = cfg.exp.saving_dir + '/obf_sco_grad/'
+    grid_name = cfg.grid.data_dir.split('/')[-2]
+    NN_DIR = cfg.exp.train_config.nn_dir + grid_name + '/acc_forecaster.pth'
+    SAVING_DIR = SAVING_DIR + f"{grid_name}/"                   # e.g., "paper_exp/obf_result/obf_uncer/bus14/"
     os.makedirs(SAVING_DIR, exist_ok=True)
+    
     TYPE = cfg.exp.type
     XD = np.array(cfg.exp.xd)
     GSCR_THRESHOLD = cfg.exp.gscr_threshold
@@ -57,11 +58,6 @@ def main(cfg: DictConfig):
     # np.save(SAVING_DIR + 'feature_total.npy', feature_total)
     # np.save(SAVING_DIR + 'load_total.npy', load_total)
     # np.save(SAVING_DIR + 'solar_total.npy', solar_total)
-    
-    # Load NN
-    model = MLP(70, 4)
-    model.load_state_dict(torch.load(cfg.exp.train_config.nn_dir))
-    model.to('cpu').eval()
     
     # Load optimization models
     uc = UC_CONTINUOUS(grid_xlsx, cfg.operation)
@@ -92,7 +88,7 @@ def main(cfg: DictConfig):
     print('input space one example:', input_space[0])
     print('output space one example:', output_space[0])
     
-    print('====== Train a logistic regression model ======')
+    print('====== Train a logistic regression model as stability assessor ======')
     # Train a logistic regression model to predict the stability of the system
     label = np.zeros(output_space.shape[0])
     label[output_space <= GSCR_THRESHOLD + OVER_VALUE] = 1  # 1 for unstable set more to be unstable
@@ -110,6 +106,13 @@ def main(cfg: DictConfig):
     
     # Preprocess the whole dataset: mainly normalize the feature
     feature_total, load_total, solar_total = data_preprocess(feature_total, load_total, solar_total)
+
+    # Load NN
+    model = MLP(feature_total.shape[1], solar_total.shape[1])
+    # model = MLP(70,4)
+    model.load_state_dict(torch.load(NN_DIR))
+    model.to('cpu').eval()
+
     nn_forecast, nn_extracted = model(torch.from_numpy(feature_total).float())
     nn_extracted = nn_extracted.detach().numpy()
     
@@ -127,6 +130,7 @@ def main(cfg: DictConfig):
     # unstable_idx_daily = np.where(np.sum(gscr_true_reshape <= GSCR_THRESHOLD, axis=1) > 0)[0]
     # print(f"Unstable ratio daily: {len(unstable_idx_daily)/len(gscr_true_reshape)}")
     
+    # Per sample-wise gradient
     performance = {
         # "cost_acc": [],
         "cost_obj": [],
@@ -176,7 +180,7 @@ def main(cfg: DictConfig):
                         )
         
         """
-        Compute the gradient of training objective with respect to the **corresponding** optimal weight and bias
+        Compute the gradient of training objective with respect to the CORRESPONDING optimal weight and bias
         """
         
         # Accuracy forecaster
@@ -226,7 +230,7 @@ def main(cfg: DictConfig):
     grad_b_obj = performance["grad_b_obj"]
     grad_b_obj_sco = performance["grad_b_obj_sco"]
     
-    grad_W_acc_norm = np.linalg.norm(grad_W_acc, axis=-1)
+    grad_W_acc_norm = np.linalg.norm(grad_W_acc, axis=-1)  # (no. of samples,)
     grad_W_obj_norm = np.linalg.norm(grad_W_obj, axis=-1)
     grad_W_obj_sco_norm = np.linalg.norm(grad_W_obj_sco, axis=-1)
     grad_b_acc_norm = np.linalg.norm(grad_b_acc, axis=-1)

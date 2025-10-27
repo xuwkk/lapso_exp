@@ -14,21 +14,25 @@ import torch
 
 
 def data_preprocess(feature, load, solar):
+    """
+    Prepare the data for training the forecaster
+    feature: (no_sample, no_node, no_feature)
+    """
     
     NO_DATA = feature.shape[0]
     
     # Normalize the feature data
     feature_mean = np.mean(feature, axis=(0,1))
     feature_std = np.std(feature, axis=(0,1))
-    feature_mean[:4] = 0
+    feature_mean[:4] = 0  # calender feature does not require normalization
     feature_std[:4] = 1
     
     # Apply normalization
     feature = (feature - feature_mean[None,None,:]) / feature_std[None,None,:]
     
     # Reshape and concatenate features
-    feature_other = feature[:,:,4:].reshape(NO_DATA, -1)
-    feature = np.concatenate([feature[:, 0, :4], feature_other], axis=1)
+    feature_other = feature[:,:,4:].reshape(NO_DATA, -1) # non_calender features (no_sample, no_node * no_non_calender_feature)
+    feature = np.concatenate([feature[:, 0, :4], feature_other], axis=1) # add calender feature (no_sample, calender + no_node * no_non_calender_feature)
     
     return feature, load, solar
     
@@ -62,7 +66,8 @@ def data_preprocess(feature, load, solar):
 def train_abf_model(feature, solar, solar_min_clip, solar_max, reduced = False, verbose = False):
     """
     train the accuracy-based forecast model
-    only forecast the solar"""
+    only forecast the solar
+    """
     
     # feature: batch_size x no_feature
     if reduced:
@@ -94,6 +99,7 @@ def train_obj_kkt_model_reduced(feature, load, solar, uc_cvxpy, rd_cvxpy,
                                 verbose = False):
     """
     Use the reduced form by moving the lower level RD as upper level constraints
+    So only the DP is reformulated as KKT
     only forecast the solar
     """
     # feature: N x no_feature
@@ -103,11 +109,12 @@ def train_obj_kkt_model_reduced(feature, load, solar, uc_cvxpy, rd_cvxpy,
         Wsolar_ = cp.Variable(shape = (feature.shape[1],))
         Wsolar = cp.diag(Wsolar_)
     else:
+        # dense matrix
         Wsolar = cp.Variable(shape = (feature.shape[1], solar.shape[1])) # XW + b
     bsolar = cp.Variable(shape = (1, solar.shape[1]))
     
     # KKT of UC
-    kkt_uc_constraints, kkt_uc_variable, uc_param,_ = form_kkt(uc_cvxpy, M)
+    kkt_uc_constraints, kkt_uc_variable, uc_param, _ = form_kkt(uc_cvxpy, M)
     # UC objective that contributes to the UL objective
     P_uc = uc_param['P'][:no_gen, :no_gen]
     q_uc = uc_param['q'][:no_gen]
@@ -139,7 +146,7 @@ def train_obj_kkt_model_reduced(feature, load, solar, uc_cvxpy, rd_cvxpy,
         solar_true = solar[i]
         
         # LL UC constraints
-        # regenerate the UC kkt constraints again
+        # ! regenerate the UC kkt constraints again
         kkt_uc_constraints, kkt_uc_variable, uc_param,_ = form_kkt(uc_cvxpy, M)
         param_uc_var = kkt_uc_variable['param_dict_as_var']
         z_uc = kkt_uc_variable['x_dict']
@@ -153,13 +160,14 @@ def train_obj_kkt_model_reduced(feature, load, solar, uc_cvxpy, rd_cvxpy,
         # UL RD constraints
         constraints+= [
             # rd constraints becomes the UL constraints
+            # rd takes true solar, true load, and uc decision as input parameter
             A_rd @ z_rd_list[i] == b_rd + B_rd['load'] @ load_true + B_rd['solar'] @ solar_true + B_rd['pg_parameter'] @ z_uc['pg'],
             G_rd @ z_rd_list[i] <= h_rd + H_rd['load'] @ load_true + H_rd['solar'] @ solar_true + H_rd['pg_parameter'] @ z_uc['pg']
         ]
         
         # Objective
-        uc_obj = 0.5 * cp.quad_form(z_uc['pg'], P_uc) + q_uc @ z_uc['pg']
-        rd_obj = 0.5 * cp.quad_form(z_rd_list[i], P_rd) + q_rd @ z_rd_list[i]
+        uc_obj = 0.5 * cp.quad_form(z_uc['pg'], P_uc) + q_uc @ z_uc['pg']     # uc cost
+        rd_obj = 0.5 * cp.quad_form(z_rd_list[i], P_rd) + q_rd @ z_rd_list[i] # rd cost
     
         obj += uc_obj + rd_obj  
     
@@ -175,7 +183,7 @@ def train_obj_kkt_model_reduced(feature, load, solar, uc_cvxpy, rd_cvxpy,
     prob.solve(solver = cp.GUROBI, verbose = verbose, 
             #    Threads = 100, Presolve = 2, 
             #    MIPFocus = 2, Cuts = 2, VarBranch = 2
-               )
+            )
     
     # print(f'obj: {obj.value/feature.shape[0]}')
     # print(f'obj_all: {obj_all.value}')
@@ -228,7 +236,7 @@ def evaluate_opt(solar_forecast, solar, load, uc_cvxpy, rd_cvxpy,
     
     total_cost = []  
     if W_assessor is not None:
-        uc_cls_result = [] # stability assessment result of UC based on the classifier
+        uc_cls_result = []  # stability assessment result of UC based on the classifier
         rd_cls_result = []
         uc_gscr_result = [] # gSCR of UC based on the true solar power
         rd_gscr_result = []
@@ -314,14 +322,14 @@ def add_stability_constraint(cvxpy_prob, W_assessor, b_assessor):
     constraints = cvxpy_prob.constraints
     solar_param = cvxpy_prob.param_dict['solar'] # [T, no_solar]
     solarc_var = cvxpy_prob.var_dict['solarc'] # [T, no_solar]
-    constraints.append(((solar_param - solarc_var) @ W_assessor).flatten(order = 'F') + b_assessor <= 0)
+    constraints.append(((solar_param - solarc_var) @ W_assessor).flatten(order = 'F') + b_assessor <= 0) # Each time step add one constraint
     updated_prob = cp.Problem(cvxpy_prob.objective, constraints)
     
     return updated_prob
 
 def subproblem_individual(rd_cvxpy, rd_parameters, load_lower, load_upper, M_RD = 1e4, verbose = True):
     """
-    Given the DP solution Pg, solve the worst-case load for the RD for a single sample
+    Given the DP solution Pg and other paraemters, solve the worst-case load for the RD for a SINGLE sample
     rd_parameters: a dictionary of rd parameters: solar, pg_parameter, load
     
     max_{load} RD objective
@@ -348,20 +356,19 @@ def subproblem_individual(rd_cvxpy, rd_parameters, load_lower, load_upper, M_RD 
     ]
     constraints.extend(kkt_rd_constraints)
     
-    # objective
+    # objective: maximize
     objective = cp.Maximize(0.5 * cp.quad_form(rd_var, rd_param['P']) + rd_param['q'] @ rd_var)
     prob = cp.Problem(objective, constraints)
     prob.solve(solver = cp.GUROBI, verbose = verbose)
     
-    # worst uncertainty, part of the upper bound of the UL objective
+    # worst uncertainty, PART of the upper bound of the UL objective (first stage cost is not included)
     return load_var.value, prob.value  # uncertainty is attained at the extreme point
 
 def random_uncertainty(solar_forecast, solar, load, load_list, uc_cvxpy, rd_cvxpy, M_RD, 
                        rd_class
                        ):
     """
-    This is used for evaluation
-    For a batch of samples to solve the subproblem of the worst-case load for the RD
+    This is used for evaluation the averaged performance of RD under random uncertainty
     start from the forecast and DP
     load_list: (no_data, no_sample, no_load)
     """
@@ -382,7 +389,7 @@ def random_uncertainty(solar_forecast, solar, load, load_list, uc_cvxpy, rd_cvxp
         for j in range(load_true_list.shape[0]):
             # For each sample
             load_random = load_true_list[j:j+1] # [1, no_load]
-            # RD
+            # Solve
             rd_parameters = {"load": load_random,
                 "solar": solar_true,
                 "pg_parameter": uc_sol['pg']
@@ -394,7 +401,7 @@ def random_uncertainty(solar_forecast, solar, load, load_list, uc_cvxpy, rd_cvxp
     
     random_total_cost_list = np.array(random_total_cost_list)
     print(f'Random total cost: {np.mean(random_total_cost_list)}')
-    return random_total_cost_list
+    return random_total_cost_list # ( no_data, no_sample)
     
 
 def worst_uncertainty(solar_forecast, solar, load, uc_cvxpy, rd_cvxpy, M_RD, 
@@ -449,7 +456,7 @@ def worst_uncertainty(solar_forecast, solar, load, uc_cvxpy, rd_cvxpy, M_RD,
         rd_sol_verify, rd_obj_verify = solve_problem(rd_cvxpy, rd_parameters_verify)
         if np.abs(rd_obj_verify - worst_rd_obj) > 1e-3:
             print('rd_obj: ', rd_obj_verify, 'worst_rd_obj: ', worst_rd_obj)
-            print('The result is not correct, potential caused by small M')
+            print('The result of evaluating worst RD is not correct, potential caused by small M')
             exit()
         # assert np.abs(rd_obj_verify - worst_rd_obj) < 1e-6, 'the result is not correct, potential caused by small M'
     
@@ -477,7 +484,7 @@ def solve_main_problem(feature, load, solar, worst_rd_load_list: list,
     Only forecast the solar
     main problem constraints: 
     - For all previous iterations and samples,
-        - upper bounding the RD objectives
+        - lower bounding the RD objectives
         - RD constraints are satisfied
     - For a single UC (all samples),
         - kkt constraints are satisfied
@@ -508,7 +515,6 @@ def solve_main_problem(feature, load, solar, worst_rd_load_list: list,
     # RD decision variables for each iteration each sample
     z_rd_list = [[cp.Variable(shape = (no_var_rd,)) for _ in range(no_sample)] for _ in range(no_iteration)]
     
-    # Upper bound of RD objectives for each sample
     # All iterations should be lower than this value
     eta = cp.Variable(shape = (no_sample,))
     
@@ -540,7 +546,7 @@ def solve_main_problem(feature, load, solar, worst_rd_load_list: list,
         constraints.extend(kkt_uc_constraints)   # UC KKT constraints
         constraints+= [ 
             # assign the forecast to the parameters (actually another variable)
-            param_uc_var['load'] == load_true,
+            param_uc_var['load'] == load_true,       # uc takes the true (which is actually the expected) load
             param_uc_var['solar'] == solar_forecast,
             ]
         
@@ -580,7 +586,7 @@ def solve_main_problem(feature, load, solar, worst_rd_load_list: list,
     prob = cp.Problem(cp.Minimize(obj), constraints)
     prob.solve(solver = cp.GUROBI, verbose = verbose)
     
-    pg_uc_list = np.array([pg_uc_value.value for pg_uc_value in pg_uc_list])
+    pg_uc_list = np.array([pg_uc_value.value for pg_uc_value in pg_uc_list]) # optimal pg_uc for each sample
     
     return Wsolar.value, bsolar.value, pg_uc_list, first_stage_obj.value, second_stage_obj.value, obj.value
 
@@ -589,7 +595,7 @@ def ccg(feature, load, solar,
         solar_min_clip, solar_max,
         budget_ratio,
         reduced = True,
-        # TODO: Below are not tested
+        # TODO: regularization is not tested
         Wsolar_acc = None, bsolar_acc = None, alpha = 0.0,
         M_DP = 1e4, M_RD = 1e4, max_iter = 100, tol = 1e-3, verbose = False):
     
@@ -598,7 +604,7 @@ def ccg(feature, load, solar,
     """
     # Initialization
     LB, UB = -1e6, 1e6
-    worst_rd_load_list = [] # Iteratively updated worst-case load in RD
+    worst_rd_load_list = [] # Iteratively updated worst-case load (worst uncertainty realizations) in RD (no_iter, no_sample)
     for iter in range(max_iter):
         Wsolar, bsolar, pg_uc_list, obj_first_stage, obj_second_stage, main_obj = solve_main_problem(
                                                             feature, load, solar, 
@@ -616,6 +622,7 @@ def ccg(feature, load, solar,
         worst_load_list, worst_obj_list = [], []
         # We did not call the previous function, because we can reuse the DP solution
         for i in range(feature.shape[0]):
+            # Construct the uncertainty set
             load_lower = np.clip(load[i] * (1 - budget_ratio), 0, None)
             load_upper = np.clip(load[i] * (1 + budget_ratio), 0, None)
             
@@ -642,7 +649,7 @@ def ccg(feature, load, solar,
 
 def return_grad_acc(W, b, feature, solar):
     """
-    Find the gradient of accuracy training objective with respect to the forecast weight (and bias)
+    Find the gradient of accuracy training objective with respect to the forecast weight (and bias) PER SAMPLE
     """
     
     # print("W shape: ", W.shape)
@@ -679,18 +686,20 @@ def return_grad_acc(W, b, feature, solar):
     
 def return_grad(W, b, feature, load, solar, uc_cvxpy, rd_cvxpy, rd_class):
     """
-    Find the gradient of the total cost with respect to the forecast weight (and bias)
+    Find the gradient of the total cost with respect to the forecast weight (and bias) PER SAMPLE
     """        
     
     load_true = torch.from_numpy(load).float()[:,None,:] # add the T dimension
     solar_true = torch.from_numpy(solar).float()[:,None,:] # add the T dimension
     feature = torch.from_numpy(feature).float()
     
+    # Cost coefficients
     first_coeff = torch.from_numpy(rd_class.first).float()
     cls_coeff = torch.from_numpy(rd_class.cls).float()
     storage_coeff = torch.from_numpy(rd_class.storage).float()
     solarc_coeff = torch.from_numpy(rd_class.csc).float()
     
+    # Build the differentiable optimization layer
     class ForecastOpt(torch.nn.Module):
         def __init__(self, no_feature, no_solar, uc_cvxpy, rd_cvxpy, W, b):
             super(ForecastOpt, self).__init__()
@@ -701,7 +710,7 @@ def return_grad(W, b, feature, load, solar, uc_cvxpy, rd_cvxpy, rd_class):
             self.linear.bias.data = torch.from_numpy(b).float()
             
         def forward(self, x, load_true, solar_true):
-            forecast = self.linear(x)
+            forecast = self.linear(x) # renewable forecast
             uc_solution = self.uc_layer(load_true, forecast, solver_args={"solve_method": "ECOS"})
             rd_solution = self.rd_layer(uc_solution[0], load_true, solar_true, solver_args={"solve_method": "ECOS"})
             return forecast, uc_solution, rd_solution

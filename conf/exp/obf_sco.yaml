@@ -5,8 +5,8 @@ gscr_threshold: 2.5
 over_value: 0.2  # gSCR threshold + over_value is the threshold for unstable samples
 saving_dir: "paper_exp/obf_result/obf_sco/"
 train_config:
-  no_data: 168
-  M: 5e2
+  no_data: 168  # fine tune a week data
+  M: 1e3
   alpha: 0.0
   verbose: false
-  nn_dir: "paper_exp/obf_result/abf/acc_forecaster.pth"
+  nn_dir: "paper_exp/obf_result/abf/"

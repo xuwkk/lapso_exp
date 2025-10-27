@@ -1,3 +1,4 @@
+# sco experiment setting for bus-14 system
 type: linear_bce
 solar_sample_no: 5
 # solar_sample_ratio_list: [0, 0.75, 0.85, 0.95, 1] # If is not None, the solar_sample_no is ignored
@@ -8,9 +9,18 @@ over_value: 0.05
 saving_dir: "paper_exp/sco_result/"
 start_date: 0
 end_date: -1
-renewable_rescale: 1.4
+renewable_rescale: 1.4          # slightly increase the renewable power to make the problem more challenging
 train_config:
   batch_size: 64
   lr: 0.001
   max_iter: 300
   patience: 10
+tight_M_bound: false            # if true, use a adaptove M bound for big-M formulation per sample (does not make too much difference)
+optimization:  
+  solver: "MOSEK"  
+  option:
+    warm_start: true
+    verbose: false
+    MSK_DPAR_MIO_TOL_ABS_GAP: 0.001 # use C api: https://www.cvxpy.org/tutorial/solvers/index.html
+    MSK_DPAR_MIO_TOL_REL_GAP: 0.001
+    MSK_DPAR_MIO_MAX_TIME: 3600  # in seconds

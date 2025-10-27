@@ -32,6 +32,10 @@ def main(cfg: DictConfig):
     SOLAR_MIN_CLIP = cfg.grid.renewable_min / cfg.grid.baseMVA
     print('SOLAR_MIN_CLIP: ', SOLAR_MIN_CLIP)
     SAVING_DIR = cfg.exp.saving_dir
+
+    grid_name = cfg.grid.data_dir.split('/')[-2]
+    NN_DIR = cfg.exp.train_config.nn_dir + grid_name + '/acc_forecaster.pth'
+    SAVING_DIR = SAVING_DIR + f"{grid_name}/"                   # e.g., "paper_exp/obf_result/obf_uncer/bus14/"
     os.makedirs(SAVING_DIR, exist_ok=True)
     
     assert cfg.operation.with_binary == False, "Only consider continuous case for now"
@@ -41,20 +45,22 @@ def main(cfg: DictConfig):
     feature_total, load_total, solar_total, _ = get_dataset_np(cfg.grid)
     NO_DATA_TOTAL = feature_total.shape[0]
     SOLAR_MAX = np.max(solar_total, axis = 0)  # Use the max solar power as the upper bound of the solar power forecast
+    SOLAR_MIN = np.min(solar_total, axis = 0)  # Use the min solar power as the lower bound of the solar power forecast
+    print('SOLAR_MAX: ', SOLAR_MAX, 'SOLAR_MIN: ', SOLAR_MIN)
     # save the data
     # np.save(SAVING_DIR + 'feature_total.npy', feature_total)
     # np.save(SAVING_DIR + 'load_total.npy', load_total)
     # np.save(SAVING_DIR + 'solar_total.npy', solar_total)
     
     print('feature shape: ', feature_total.shape, 'load shape: ', 
-          load_total.shape, 'solar shape: ', solar_total.shape)
+        load_total.shape, 'solar shape: ', solar_total.shape)
     
     # Load NN
-    model = MLP(70, 4)
-    model.load_state_dict(torch.load(cfg.exp.train_config.nn_dir))
+    model = MLP(feature_total.shape[1], solar_total.shape[1])
+    model.load_state_dict(torch.load(NN_DIR))
     model.to('cpu').eval()
     
-    # Load optimization models
+    # Load optimization models: continuous UC + RD (without binary input parameters)
     uc = UC_CONTINUOUS(grid_xlsx, cfg.operation)
     uc.formulate()
     rd = RD(grid_xlsx, cfg.operation)
@@ -68,21 +74,24 @@ def main(cfg: DictConfig):
     assert np.all(gen_diff >= 0), "Generation + renewable capacity is not enough to cover the load"
     
     # Preprocess the whole data
-    feature_total, load_total, solar_total = data_preprocess(feature_total, load_total, solar_total)
+    feature_total, load_total, solar_total = data_preprocess(feature_total, load_total, solar_total) # normalize feature only
     nn_forecast, nn_extracted = model(torch.from_numpy(feature_total).float())
     nn_extracted = nn_extracted.detach().numpy()
     
     for i in tqdm(range(NO_DATA_TOTAL // NO_DATA)):
         
         # Use the NN extracted feature as the input of the ABF model
+        # The linear forecaster is trained on smaller dataset such as a week
         feature = nn_extracted[i * NO_DATA:(i + 1) * NO_DATA]
         load = load_total[i * NO_DATA:(i + 1) * NO_DATA]
         solar = solar_total[i * NO_DATA:(i + 1) * NO_DATA]
         
+        # train accuracy-based forecaster
         Wsolar_acc, bsolar_acc = train_abf_model(
                     feature, solar, SOLAR_MIN_CLIP, SOLAR_MAX, 
                     reduced = False, verbose = VERBOSE)
         
+        # train objective-based forecaster
         Wsolar_obj, bsolar_obj, cost_obj_train = train_obj_kkt_model_reduced(
                         feature, load, solar, uc.prob_cvxpy, rd.prob_cvxpy,
                         uc.no_gen,
@@ -107,10 +116,10 @@ def main(cfg: DictConfig):
         # Verify kkt formulation is correct to the direct optimization
         assert np.isclose(np.mean(cost_obj), cost_obj_train), "The cost of the objective-based forecast is not close to its training cost"
         
-        # save the results
+        # save the results: store for all linear forecasters
         performance_dict = {
-            'solar': solar if i == 0 else np.concatenate((performance_dict['solar'], solar), axis = 0),
-            'load': load if i == 0 else np.concatenate((performance_dict['load'], load), axis = 0),
+            # 'solar': solar if i == 0 else np.concatenate((performance_dict['solar'], solar), axis = 0),
+            # 'load': load if i == 0 else np.concatenate((performance_dict['load'], load), axis = 0),
             'cost_true': cost_true if i == 0 else np.concatenate((performance_dict['cost_true'], cost_true), axis = 0),
             'cost_abf': cost_acc if i == 0 else np.concatenate((performance_dict['cost_abf'], cost_acc), axis = 0),
             'cost_obf': cost_obj if i == 0 else np.concatenate((performance_dict['cost_obf'], cost_obj), axis = 0),

@@ -1,13 +1,10 @@
 __pycache__/
-lapso/*
-!lapso/.placeholder
 deleted/*
 data/*
 !data/.placeholder
-pso/*
-!pso/.placeholder
 paper_exp/obf_result/*
 paper_exp/sco_result/*
+paper_exp/sco_smart_sample_result/*
 *.pdf
 outputs/*
 *.out

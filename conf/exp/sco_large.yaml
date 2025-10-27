@@ -1,0 +1,30 @@
+type: nn_large_1
+xd_min: 0.15 # random generate xd in [xd_min, xd_max]
+xd_max: 0.25
+gscr_threshold: 2.5
+over_value: 2.5
+saving_dir: "paper_exp/sco_large_result/"
+no_sample: 100               # no sample used for training
+no_sample_test: 1
+renewable_rescale: 1.0       # rescale the renewable generation data for larger penetration
+regression: false            # if false, train NN as a classifier
+trust_region: false
+random_on_gen: false
+random_renewable: false
+train_config:
+  batch_size: 64
+  lr: 0.001
+  max_iter: 5000
+  patience: 50
+  weight_decay: 1e-4
+tight_M_bound: false         # if true, use a adaptove M bound for big-M formulation per sample (does not make too much difference)
+train_new_nn: false
+generate_new_dataset: false
+optimization:  
+  solver: "GUROBI"  
+  option:
+    MIPGap: 1e-2
+    MIPGapAbs: 1e-3 
+    TimeLimit: 3600
+    ConcurrentMIP: 20
+    MIPFocus: 1
