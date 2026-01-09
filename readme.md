@@ -4,6 +4,8 @@
 <img src="repo_figure/repo_lapso_logo.png" alt="LAPSO" width="200"/>
 </p>
 
+> **Important Update**: The `pso` package has been published as a standalone package, and renamed as `GridForge`. Please refer to the [GridForge](https://github.com/xuwkk/gridforge) repository for the latest updates.
+
 This repository contains the code for paper *"A Unified Optimization View for Learning-Augmented Power System Operations"* by Wangkun Xu (Imperial College London), Zhongda Chu (Tianjin University), and Fei Teng (Imperial College London). The paper is under review ([preprint available](https://arxiv.org/abs/2505.05203)) and more code will be released after the review process. This repository is maintained by Wangkun Xu.
 
 This repo contains complete functions for reimplementing the experiments in the paper. And the dedicated python packages for `pso` and `lapso` will be released soon.
