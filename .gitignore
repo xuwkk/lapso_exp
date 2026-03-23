@@ -8,5 +8,7 @@ paper_exp/sco_smart_sample_result/*
 *.pdf
 outputs/*
 *.out
+!prepare_1354pegase.out
 run_sco.py
 !repo_figure/**
+*.ipynb

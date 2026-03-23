@@ -4,6 +4,8 @@ import pypower.api as pp
 import os
 import shutil
 from pso.solve_opt import solve_opt
+import importlib
+from cvxpy_summary import print_summary
 
 def prepare_grid_from_pypower(grid_cfg:dict, force_new:bool=False, random_seed = 0):
     """
@@ -32,7 +34,13 @@ def prepare_grid_from_pypower(grid_cfg:dict, force_new:bool=False, random_seed =
     
     
     # Obtain the pypower entries
-    ppc = getattr(pp, grid_cfg['pypower_case_name'])()
+    try:
+        ppc = getattr(pp, grid_cfg['pypower_case_name'])()
+    except AttributeError:
+        # import the case from the local file
+        module = importlib.import_module(grid_cfg['pypower_case_name'])
+        ppc = getattr(module, grid_cfg['pypower_case_name'])()
+        
     sheet_dict = {}
     for key, value in ppc.items():
         if key not in ['version', 'baseMVA']:
@@ -400,6 +408,8 @@ def refine_config(load, solar, wind, grid_cfg:dict, optimization_cfg:dict, uc):
         print(f"force_new_data is set to False, please set it to True to modify the maximum branch limits in place")
         return
     
+    print(f"optimization_cfg: {optimization_cfg}")
+    
     min_pfmax = grid_cfg['rescale_line_limit']['min_pfmax']
     scale_factor = grid_cfg['rescale_line_limit']['scale_factor']
     
@@ -408,6 +418,8 @@ def refine_config(load, solar, wind, grid_cfg:dict, optimization_cfg:dict, uc):
     # print(f"The initial pfmax is {uc.pfmax}")
     uc.formulate() # Formulate the uc problem
     print('uc.with_pf_constraint: ', uc.with_pf_constraint)
+    
+    print_summary(uc.prob_cvxpy)
     
     uc.optimization_summary()
     uc.system_summary()
@@ -423,6 +435,7 @@ def refine_config(load, solar, wind, grid_cfg:dict, optimization_cfg:dict, uc):
     print(f"Data sizes: load {load_batch.shape}, solar {None if solar_batch is None else solar_batch.shape}, wind {None if wind_batch is None else wind_batch.shape}")
     
     # Solve the uc problem
+    
     uc_results = solve_opt(uc, load_batch, solar_batch, wind_batch, optimization_cfg)
     
     """analysis"""
@@ -463,142 +476,3 @@ def refine_config(load, solar, wind, grid_cfg:dict, optimization_cfg:dict, uc):
             value.to_excel(writer, sheet_name=key, index=False)
     
     print(f"The maximum branch limits have been rescaled and saved to {grid_cfg['config_xlsx_path']}")
-
-
-
-
-
-    # assigned_solar_no = 0
-    # if 'solar' in grid_xlsx.keys():
-    #     solar_config = grid_xlsx['solar']
-    #     for i in range(len(solar_config)):
-    #         solar_bus_idx = solar_config['INDEX'][i]
-            
-    #         for name in file_name:
-    #             if not name.endswith('.csv') or name in assigned_name:
-    #                 # Find a bus data file containing solar data that hasn't been used yet
-    #                 continue
-                    
-    #             data = pd.read_csv(os.path.join(data_grouped_dir, name))
-    #             if np.sum(data['Solar']) <= 0 or np.sum(data['Load']) <= 0:
-    #                 # only consider solar located at the load bus
-    #                 continue
-                    
-    #             assigned_name.append(name)
-                
-    #             # Rescale load and solar data
-    #             default_load = bus_config['PD'][solar_bus_idx - 1]
-    #             data['Load'] = data['Load'] * default_load / np.max(data['Load'])
-                
-    #             default_solar = solar_config['CAPACITY'][i] 
-    #             data['Solar'] = data['Solar'] * default_solar / np.max(data['Solar'])
-                
-    #             load_data_all[solar_bus_idx] = data
-    #             assigned_solar_no += 1
-    #             break
-
-
-    #     # after going through all the data files, check if enough solar data has been assigned
-    #     if assigned_solar_no < no_solar:
-    #         print(f"Warning: only {assigned_solar_no} solar data have been assigned, less than the required {no_solar}")
-    #         print("Repeated solar data is randomly assigned to the remaining solar buses and rescale")
-
-    #         for i in range(assigned_solar_no, no_solar):
-    #             # index of this solar bus
-    #             solar_bus_idx = solar_config['INDEX'][i]
-    #             # pick one from the load_data_all that has solar
-    #             # by design, it already has load
-    #             available_idx = [key for key in load_data_all.keys() if len(load_data_all[key]) > 0 and np.sum(load_data_all[key]['Solar']) > 0]
-    #             chosen_idx = np.random.choice(available_idx, 1)[0]
-    #             data = load_data_all[chosen_idx].copy()
-    #             # Rescale load and solar data
-    #             default_load = bus_config['PD'][solar_bus_idx - 1]
-    #             data['Load'] = data['Load'] * default_load / np.max(data['Load'])
-    #             default_solar = solar_config['CAPACITY'][i]
-    #             data['Solar'] = data['Solar'] * default_solar / np.max(data['Solar'])
-    #             load_data_all[solar_bus_idx] = data
-            
-    # assigned_wind_no = 0
-    # if 'wind' in grid_xlsx.keys():
-    #     wind_config = grid_xlsx['wind']
-    #     for i in range(len(wind_config)):
-    #         wind_bus_idx = wind_config['INDEX'][i]
-            
-    #         # Find a bus data file containing wind data that hasn't been used yet
-    #         for name in file_name:
-    #             if not name.endswith('.csv') or name in assigned_name:
-    #                 # each bus either have solar or wind
-    #                 continue
-                    
-    #             data = pd.read_csv(os.path.join(data_grouped_dir, name))
-    #             if np.sum(data['Wind']) <= 0 or np.sum(data['Load']) <= 0:
-    #                 continue
-                    
-    #             assigned_name.append(name)
-                
-    #             # Rescale load and wind data
-    #             default_load = bus_config['PD'][wind_bus_idx - 1]
-    #             data['Load'] = data['Load'] * default_load / np.max(data['Load'])
-                
-    #             default_wind = wind_config['CAPACITY'][i]
-    #             data['Wind'] = data['Wind'] * default_wind / np.max(data['Wind'])
-                
-    #             load_data_all[wind_bus_idx] = data
-    #             assigned_wind_no += 1
-    #             break
-        
-        # if assigned_wind_no < no_wind:
-        #     print(f"Warning: only {assigned_wind_no} wind data have been assigned, less than the required {no_wind}")
-        #     print("Repeated wind data is randomly assigned to the remaining wind buses")
-
-        #     for i in range(assigned_wind_no, no_wind):
-        #         # index of this wind bus
-        #         wind_bus_idx = wind_config['INDEX'][i]
-        #         # pick one from the load_data_all that has wind
-        #         available_idx = [key for key in load_data_all.keys() if len(load_data_all[key]) > 0 and np.sum(load_data_all[key]['Wind']) > 0]
-        #         chosen_idx = np.random.choice(available_idx, 1)[0]
-        #         data = load_data_all[chosen_idx].copy()
-        #         # Rescale load and wind data
-        #         default_load = bus_config['PD'][wind_bus_idx - 1]
-        #         data['Load'] = data['Load'] * default_load / np.max(data['Load'])
-        #         default_wind = wind_config['CAPACITY'][i]
-        #         data['Wind'] = data['Wind'] * default_wind / np.max(data['Wind'])
-        #         load_data_all[wind_bus_idx] = data
-
-
-    # if len(remaining_file_name) > 0:
-    #     # there are remaining data files
-    #     remaining_file_name = np.random.choice(remaining_file_name, no_load - len(assigned_name), replace=False)
-    #     idx = 0
-    #     for i in load_bus_idx:
-    #         if len(load_data_all[i]) == 0: # the load has not been assigned
-    #             name = remaining_file_name[idx]
-    #             data = pd.read_csv(os.path.join(data_grouped_dir, name))
-    #             # Rescale load
-    #             max_load = np.max(data['Load'])
-    #             default_load = bus_config['PD'][i - 1]
-    #             data['Load'] = data['Load'] * default_load / max_load
-    #             data['Solar'] = 0     # pure load bus
-    #             data['Wind'] = 0
-    #             load_data_all[i] = data
-    #             assigned_name.append(name)
-    #             idx += 1
-    # else:
-    #     # there is no remaining data files
-    #     idx = 0
-    #     for i in load_bus_idx:
-    #         if len(load_data_all[i]) == 0:
-    #             # if not enough remaining files, randomly choose one from the assigned data
-    #             print(f"Warning: not enough remaining data files, randomly choose one from the assigned data")
-    #             available_idx = [key for key in load_data_all.keys() if len(load_data_all[key]) > 0]
-    #             chosen_idx = np.random.choice(available_idx, 1)[0]
-    #             data = load_data_all[chosen_idx].copy()
-    #             # Rescale load
-    #             default_load = bus_config['PD'][i - 1]
-    #             data['Load'] = data['Load'] * default_load / np.max(data['Load'])
-    #             data['Solar'] = 0
-    #             data['Wind'] = 0
-    #             load_data_all[i] = data
-    #             idx += 1
-
-

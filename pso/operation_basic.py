@@ -284,11 +284,13 @@ class PS_Basic:
             self.prob_cvxpy.solve(solver=getattr(cp, solver.upper()),
                         warm_start=warm_start,
                         verbose=verbose,
+                        ignore_dpp = True,
                         **solver_options)
         elif solver == 'mosek' or solver == 'MOSEK':
             self.prob_cvxpy.solve(solver=getattr(cp, solver.upper()),
                                 warm_start=warm_start,
                                 verbose=verbose,
+                                ignore_dpp = True,
                                 mosek_params=solver_options)
         else:
             raise ValueError(f'Solver {solver} not supported')

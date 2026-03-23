@@ -1,6 +1,8 @@
 import numpy as np
 from functools import partial
 from tqdm import tqdm
+import time
+
 def solve_opt(uc, load_forecast, solar_forecast, wind_forecast, optimization_cfg:dict,
               rd = None, load_true = None, solar_true = None, wind_true = None):
     """
@@ -30,6 +32,7 @@ def solve_opt(uc, load_forecast, solar_forecast, wind_forecast, optimization_cfg
         solve_rd = partial(rd.solve, solver=solver, **solver_options)
         rd_results = []
     
+    start_time = time.time()
     for i in tqdm(range(no_sample)):
         uc_parameters = {
             'load': load_forecast[i], 
@@ -50,5 +53,6 @@ def solve_opt(uc, load_forecast, solar_forecast, wind_forecast, optimization_cfg
             }
             rd_result = solve_rd(rd_parameters)
             rd_results.append(rd_result)
-    
+    end_time = time.time()
+    print(f"Time taken: {end_time - start_time} seconds")
     return (uc_results, rd_results) if rd is not None else uc_results
