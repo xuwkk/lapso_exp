@@ -15,6 +15,7 @@ def convert_matpower_to_pypower(
     matpower_path: str | pathlib.Path,
     output_path: str | pathlib.Path | None = None,
     function_name: str | None = None,
+    regularize_bus_indices: bool = False,
 ) -> str:
     """
     Convert a MATPOWER .m case file into a PYPOWER-style .py case file.
@@ -29,6 +30,9 @@ def convert_matpower_to_pypower(
     function_name : str | None
         Name of the Python case function. If None, inferred from the MATPOWER
         function name, e.g. `case1197`.
+    regularize_bus_indices : bool
+        If True, remap bus numbers to dense indices 1..N in bus-row order and
+        update all known bus-reference fields accordingly.
 
     Returns
     -------
@@ -61,6 +65,8 @@ def convert_matpower_to_pypower(
 
     assignments = _parse_assignments(clean)
     case = {k: _parse_expr(v) for k, v in assignments.items()}
+    if regularize_bus_indices:
+        _regularize_bus_indices(case)
     py_code = _generate_pypower_case(case, function_name)
 
     if output_path is not None:
@@ -350,6 +356,62 @@ def _parse_number(tok: str) -> int | float:
     return val
 
 
+def _as_int_if_numeric(x: Any) -> int | None:
+    if isinstance(x, bool):
+        return None
+    if isinstance(x, int):
+        return x
+    if isinstance(x, float):
+        if math.isfinite(x) and x.is_integer():
+            return int(x)
+        return None
+    return None
+
+
+def _remap_matrix_columns(
+    rows: Any, columns: tuple[int, ...], bus_id_map: dict[int, int]
+) -> None:
+    if not (isinstance(rows, list) and rows and isinstance(rows[0], list)):
+        return
+
+    for row in rows:
+        for col in columns:
+            if col >= len(row):
+                continue
+            old_id = _as_int_if_numeric(row[col])
+            if old_id is None:
+                continue
+            new_id = bus_id_map.get(old_id)
+            if new_id is not None:
+                row[col] = new_id
+
+
+def _regularize_bus_indices(case: dict[str, Any]) -> None:
+    bus_rows = case.get("bus")
+    if not (isinstance(bus_rows, list) and bus_rows and isinstance(bus_rows[0], list)):
+        return
+
+    bus_id_map: dict[int, int] = {}
+    next_id = 1
+
+    for row in bus_rows:
+        if not row:
+            continue
+        old_id = _as_int_if_numeric(row[0])
+        if old_id is None:
+            continue
+        if old_id not in bus_id_map:
+            bus_id_map[old_id] = next_id
+            next_id += 1
+        row[0] = bus_id_map[old_id]
+
+    # Known MATPOWER/PYPOWER fields containing bus references.
+    _remap_matrix_columns(case.get("gen"), (0,), bus_id_map)
+    _remap_matrix_columns(case.get("branch"), (0, 1), bus_id_map)
+    _remap_matrix_columns(case.get("areas"), (1,), bus_id_map)
+    _remap_matrix_columns(case.get("dcline"), (0, 1), bus_id_map)
+
+
 def _py_repr(x: Any) -> str:
     if isinstance(x, float):
         if math.isnan(x):
@@ -363,7 +425,8 @@ def _py_repr(x: Any) -> str:
 def _format_matrix(rows: list[list[Any]], indent: str = "        ") -> str:
     lines = ["array(["]
     for row in rows:
-        lines.append(f"{indent}{_py_repr(row)},")
+        row_items = ", ".join(_py_repr(item) for item in row)
+        lines.append(f"{indent}[{row_items}],")
     lines.append("])")
     return "\n".join(lines)
 
@@ -414,10 +477,18 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--case_name", type=str, required=True, help="Case name")
+    parser.add_argument(
+        "--regularize_bus_indices",
+        "--regularize-bus-indices",
+        action="store_true",
+        dest="regularize_bus_indices",
+        help="Remap bus IDs to dense 1..N indices and update references.",
+    )
     args = parser.parse_args()
     
     case_name = args.case_name
     
     convert_matpower_to_pypower(matpower_path=f"{case_name}.m",
                                 output_path=f"{case_name}.py",
+                                regularize_bus_indices=args.regularize_bus_indices,
                                 )
