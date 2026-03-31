@@ -13,12 +13,17 @@ font = {'size'   : 20}
 plt.rc('font', **font)
 
 # Define colors
-BLUE = '#4444FF'
-RED = '#FF4444'
+BLUE = '#2C73D2'
+RED = '#FF6666'
+GREEN = '#2ac195'
+PURPLE = '#8290bb'
+YELLOW = '#cda23d'
 
-GREEN = '#44FF44'
-PURPLE = '#FF44FF'
-YELLOW = '#FFFF44'
+# BLUE = '#4444FF'
+# RED = '#FF4444'
+# GREEN = '#44FF44'
+# PURPLE = '#FF44FF'
+# YELLOW = '#FFFF44'
 
 """
 Draw the areas
@@ -208,7 +213,7 @@ Plot cost vs OR
 """
 
 # Cost vs OR
-fig, ax1 = plt.subplots(figsize=(8, 4), dpi=300)
+fig, ax1 = plt.subplots(figsize=(5, 4), dpi=300)
 
 model_name_list = ["LgR", "cLgR", r"$NN_2^{12}$", r"$NN_2^{111}$", r"$NN_3^{161}$", r"$NN_3^{221}$"]
 
@@ -218,7 +223,7 @@ ax1.set_ylabel('Overreact Rate (%)', color=BLUE)
 ax1.tick_params(axis='y', labelcolor=BLUE)
 ax1.grid(True, linestyle='--', alpha=0.7)
 ax1.set_ylim(0, 15)
-# plt.xticks(rotation=15)
+plt.xticks(rotation=25)
 
 # Plot Cost on right y-axis
 ax2 = ax1.twinx()
@@ -243,15 +248,15 @@ plt.show()
 Plot time vs no. of binary variables
 """
 
-fig, ax1 = plt.subplots(figsize=(8, 4), dpi=300)
+fig, ax1 = plt.subplots(figsize=(5, 4), dpi=300)
 
 # Plot No. of Binary Variables on left y-axis with markers and grid
-ax1.plot(model_name_list, np.array(no_binary_list) / 10, color=BLUE, marker='s', linewidth=2, markersize=8, label='No. of Binary')
+ax1.plot(model_name_list, np.array(no_binary_list) / 10, color=BLUE, marker='s', linewidth=2, markersize=8, label='No. Binary')
 ax1.set_ylabel(r'NO. Binary ($\times 10$)', color=BLUE)
 ax1.set_ylim(25, 95)
 ax1.tick_params(axis='y', labelcolor=BLUE)
 ax1.grid(True, linestyle='--', alpha=0.7)
-# plt.xticks(rotation=15)
+plt.xticks(rotation=25)
 
 # Plot Time on right y-axis
 ax2 = ax1.twinx()
@@ -298,7 +303,7 @@ for day_idx in range(no_day):
 
     # Daily plot colors
     ax1.bar(x - width/2, ori_ug_hourly_total[day_idx], width, label=r'$\mathcal{P}_{basic}$', color=BLUE)
-    ax1.bar(x + width/2, sco_ug_hourly_total[day_idx], width, label=r'$\mathcal{P}_{inf}^{sco}$', color=RED)
+    ax1.bar(x + width/2, sco_ug_hourly_total[day_idx], width, label=r'$\mathcal{P}_{sco}$', color=RED)
     ax1.set_xlabel('Hour of Day', fontweight='normal')
     ax1.set_ylabel('NO. Online Gen.', fontweight='normal', color='black')
     ax1.tick_params(axis='y', labelcolor='black')
@@ -316,9 +321,11 @@ for day_idx in range(no_day):
     ax2 = ax1.twinx()
     # ax2.plot(x, solar_hourly_total[day_idx], color=YELLOW, linestyle='--', linewidth=2, label=r'Solar Power')
     ax2.plot(x, ori_solar_hourly_total[day_idx], color=GREEN, linestyle='--', linewidth=2, label=r'$\mathcal{P}_{basic}$')
-    ax2.plot(x, sco_solar_hourly_total[day_idx], color=PURPLE, linestyle='--', linewidth=2, label=r'$\mathcal{P}_{inf}^{sco}$')
+    ax2.plot(x, sco_solar_hourly_total[day_idx], color=PURPLE, linestyle='--', linewidth=2, label=r'$\mathcal{P}_{sco}$')
     # Create shaded area with label
-    ax2.fill_between(x, ori_solar_hourly_total[day_idx], sco_solar_hourly_total[day_idx], alpha=0.2, color=PURPLE, label='Curtail')
+    ax2.fill_between(x, ori_solar_hourly_total[day_idx], sco_solar_hourly_total[day_idx], 
+                    #  alpha=0.2, 
+                     color=PURPLE, label='Curtail')
     ax2.set_ylabel(r'Solar ($\times 10^2 MW$)', fontweight='normal', color='black')
     ax2.tick_params(axis='y', labelcolor='black')
 

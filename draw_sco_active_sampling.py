@@ -15,12 +15,17 @@ font = {'size'   : 20}
 plt.rc('font', **font)
 
 # Define colors
-BLUE = '#4444FF'
-RED = '#FF4444'
+BLUE = '#2C73D2'
+RED = '#FF6666'
+GREEN = '#2ac195'
+PURPLE = '#8290bb'
+YELLOW = '#cda23d'
 
-GREEN = '#44FF44'
-PURPLE = '#FF44FF'
-YELLOW = '#FFFF44'
+# BLUE = '#4444FF'
+# RED = '#FF4444'
+# GREEN = '#44FF44'
+# PURPLE = '#FF44FF'
+# YELLOW = '#FFFF44'
 
 sco_dir = "paper_exp/sco_smart_sample_result"
 grid_list = ["bus14", "bus39", "bus57", "bus118", "bus300"]
@@ -162,7 +167,7 @@ colors = [BLUE, RED, YELLOW, GREEN, PURPLE]  # Red, Green, Blue, Yellow
 color_map = [colors[i % len(colors)] for i in range(len(top))]
 
 ax.bar3d(x, y, bottom, width, depth, top, shade=True, color=color_map,
-         edgecolor='black', linewidth=0.3, alpha=0.95)
+         edgecolor='black', linewidth=0.3, alpha=0.55)
 
 # Labeling
 font_size = 26
