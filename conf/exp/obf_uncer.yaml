@@ -5,7 +5,7 @@ no_train_sample: "all"   # how many samples are considered in the training
 tol: 1e-3
 train_config:
   no_data: 168
-  no_random_load_sample: 20
+  no_random_load_sample: 20   # for random load test (not used in the paper)
   M_DP: 1e3  # big-M when linearizing the dispatch problem kkt
   M_RD: 1e3  # big-M when linearizing the redispatch problem kkt
   alpha: 0.0

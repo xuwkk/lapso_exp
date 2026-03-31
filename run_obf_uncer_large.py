@@ -43,7 +43,7 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Run OBF experiments with specified grid and sample size.")
     parser.add_argument("--grid", type=str, required=True, help="Grid to use (e.g., bus39)")
-    parser.add_argument("--sample_size", type=int, default=10, help="Number of training samples (default: 1000)")
+    parser.add_argument("--sample_size", type=int, default=10, help="Number of training samples (default: 10)")
     args = parser.parse_args()
 
     run_obf_experiments(grid_name=args.grid, sample_size=args.sample_size)

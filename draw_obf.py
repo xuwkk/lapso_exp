@@ -12,11 +12,18 @@ plt.rcParams["font.serif"] = ["Times New Roman"] + plt.rcParams["font.serif"]
 plt.rc('font', size=20)
 
 # Define consistent colors for all plots
-BLUE = '#4444FF'
-RED = '#FF4444'
-GREEN = '#44FF44'
-PURPLE = '#FF44FF'
-YELLOW = '#FFFF44'
+BLUE = '#2C73D2'
+RED = '#FF6666'
+GREEN = '#2ac195'
+PURPLE = '#8290bb'
+YELLOW = '#cda23d'
+
+# old color palette
+# BLUE = '#4444FF'
+# RED = '#FF4444'
+# PURPLE = '#9B4DE0'
+# YELLOW = '#FFFF44'
+# GREEN = '#44FF44'
 
 data_dir = 'paper_exp/obf_result'
 
@@ -178,9 +185,9 @@ def evaluate_obf_sco(grid_name):
     
     # Plot scatter points
     ax.scatter(abf_forecast_err[start_idx_:end_idx_], abf_cost[start_idx_:end_idx_]/100, 
-              label=r'$\mathcal{P}_{train}^{abf}$', color=RED, alpha=0.6, s=50)
+              label=r'$\mathcal{M}_{abf}$', color=RED, alpha=0.6, s=50)
     ax.scatter(obf_forecast_err[start_idx_:end_idx_], obf_cost[start_idx_:end_idx_]/100, 
-              label=r'$\mathcal{P}_{train}^{obf/basic}$', color=BLUE, alpha=0.6, s=50)
+              label=r'$\mathcal{M}_{obf}$', color=BLUE, alpha=0.6, s=50)
     
     # Add mean points
     abf_mean_x = np.mean(abf_forecast_err[start_idx_:end_idx_])
@@ -189,9 +196,9 @@ def evaluate_obf_sco(grid_name):
     obf_mean_y = np.mean(obf_cost[start_idx_:end_idx_]/100)
     
     ax.scatter(abf_mean_x, abf_mean_y, color=RED, marker='*', s=400, 
-              label=r'$\mathcal{P}_{train}^{abf}$', edgecolor='black', linewidth=1)
+              label=r'$\mathcal{M}_{abf}$ (mean)', edgecolor='black', linewidth=1)
     ax.scatter(obf_mean_x, obf_mean_y, color=BLUE, marker='*', s=400, 
-              label=r'$\mathcal{P}_{train}^{obf/basic}$', edgecolor='black', linewidth=1)
+              label=r'$\mathcal{M}_{obf}$ (mean)', edgecolor='black', linewidth=1)
     
     # Add arrow between means
     ax.annotate('', xy=(obf_mean_x, obf_mean_y), xytext=(abf_mean_x, abf_mean_y),
@@ -209,7 +216,9 @@ def evaluate_obf_sco(grid_name):
     plt.savefig(data_dir + f'/obf_sco/{grid_name}/scatter_plot.pdf', dpi=600, bbox_inches='tight', pad_inches=0.1)
     plt.close()
     
-    # Plot seasonal performance
+    """
+    Draw the seasonal performance comparison between the three methods
+    """
     # Each method build a dictionary, Each entry is a list of seasonal performance
     true_performance = {
         'solar_ave': [], 'load_ave': [],
@@ -258,14 +267,14 @@ def evaluate_obf_sco(grid_name):
     load = all_performance['true']['load_ave']
 
     # Create figure for evaluating original case
-    fig, ax1 = plt.subplots(figsize=(4, 4))
+    fig, ax1 = plt.subplots(figsize=(5, 4))
     x = np.arange(4)
     width = 0.2
 
     # Plot bars
-    ax1.bar(x - width, acc_ori_diff * 100, width, label=r'$\mathcal{P}_{train}^{abf}$', color=RED)
-    ax1.bar(x, obj_ori_diff * 100, width, label=r'$\mathcal{P}_{train}^{obf}$', color=BLUE)
-    ax1.bar(x + width, obj_sco_ori_diff * 100, width, label=r'$\mathcal{P}_{train}^{obf/sco}$', color=PURPLE)
+    ax1.bar(x - width, acc_ori_diff * 100, width, label=r'$\mathcal{M}_{abf}$', color=RED)
+    ax1.bar(x, obj_ori_diff * 100, width, label=r'$\mathcal{M}_{obf}$', color=BLUE)
+    ax1.bar(x + width, obj_sco_ori_diff * 100, width, label=r'$\mathcal{M}_{obf/sco}$', color=PURPLE)
 
     # Customize plot
     ax1.set_ylabel('Rel. Cost Diff (%)')
@@ -279,14 +288,14 @@ def evaluate_obf_sco(grid_name):
     plt.close()
 
     # Create figure for evaluating SCO case
-    fig, ax1 = plt.subplots(figsize=(4, 4))
+    fig, ax1 = plt.subplots(figsize=(5, 4))
     x = np.arange(4)
     width = 0.2
 
     # Plot bars
-    ax1.bar(x - width, acc_sco_diff * 100, width, label=r'$\mathcal{P}_{train}^{abf}$', color=RED)
-    ax1.bar(x, obj_sco_diff * 100, width, label=r'$\mathcal{P}_{train}^{obf}$', color=BLUE)
-    ax1.bar(x + width, obj_sco_sco_diff * 100, width, label=r'$\mathcal{P}_{train}^{obf/sco}$', color=PURPLE)
+    ax1.bar(x - width, acc_sco_diff * 100, width, label=r'$\mathcal{M}_{abf}$', color=RED)
+    ax1.bar(x, obj_sco_diff * 100, width, label=r'$\mathcal{M}_{obf}$', color=BLUE)
+    ax1.bar(x + width, obj_sco_sco_diff * 100, width, label=r'$\mathcal{M}_{obf/sco}$', color=PURPLE)
 
     # Customize plot
     ax1.set_ylabel('Rel. Cost Diff (%)')
@@ -299,7 +308,68 @@ def evaluate_obf_sco(grid_name):
     plt.tight_layout()
     plt.savefig(data_dir + f'/obf_sco/{grid_name}/seasonal_performance_sco.pdf', dpi=300, bbox_inches='tight', pad_inches=0)
     plt.close()
+
+def plot_uncertainty_performance_multi():
+    # Plot the performance of the multi-uncertainty case
     
+    data_dir = f'paper_exp/obf_result/obf_uncer_multi/bus14/'
+    uncertainty_budget = '0.05_0.1_0.05'
+    performance_dict = np.load(data_dir + f'{uncertainty_budget}.npy', allow_pickle=True).item()
+    
+    cost_abf = performance_dict['cost_acc'] * 100
+    cost_abf_ml = performance_dict['worst_cost_acc_input'] * 100
+    cost_abf_opt = performance_dict['worst_cost_acc'] * 100
+    cost_abf_multi = performance_dict['worst_cost_acc_multi'] * 100
+    
+    cost_obf = performance_dict['cost_obj'] * 100
+    cost_obf_ml = performance_dict['worst_cost_obj_input'] * 100
+    cost_obf_opt = performance_dict['worst_cost_obj'] * 100
+    cost_obf_multi = performance_dict['worst_cost_obj_multi'] * 100
+    
+    print('ABF Cost: ', np.mean(cost_abf), 'ML Cost: ', np.mean(cost_abf_ml), 'Opt Cost: ', np.mean(cost_abf_opt), 'Multi Cost: ', np.mean(cost_abf_multi))
+    print('OBF Cost: ', np.mean(cost_obf), 'ML Cost: ', np.mean(cost_obf_ml), 'Opt Cost: ', np.mean(cost_obf_opt), 'Multi Cost: ', np.mean(cost_obf_multi))
+
+    means_abf = [np.mean(cost_abf), np.mean(cost_abf_ml), np.mean(cost_abf_opt), np.mean(cost_abf_multi)]
+    means_obf = [np.mean(cost_obf), np.mean(cost_obf_ml), np.mean(cost_obf_opt), np.mean(cost_obf_multi)]
+    y_max = max(max(means_abf), max(means_obf)) / 100 * 1.15  # shared upper limit with margin for labels
+
+    # Bar plot for ABF
+    fig, ax = plt.subplots(figsize=(6, 4))
+    labels_abf = ['Nominal', 'ML', 'Opt', 'Multi']
+    x_abf = np.arange(len(labels_abf))
+    bars_abf = ax.bar(x_abf, np.array(means_abf) / 100, color=[BLUE, RED, GREEN, PURPLE], width=0.4)
+    ax.set_ylabel(r'PSO Cost ($\times10^2$£)')
+    ax.set_ylim(0, y_max)
+    ax.set_xticks(x_abf)
+    ax.set_xticklabels(labels_abf)
+    ax.grid(True, alpha=0.3)
+    for rect in bars_abf:
+        height = rect.get_height()
+        ax.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                    xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontsize=14)
+    plt.tight_layout()
+    plt.savefig(data_dir + f'bar_plot_abf_{uncertainty_budget}.pdf', dpi=300, bbox_inches='tight', pad_inches=0)
+    plt.close()
+
+    # Bar plot for OBF
+    fig, ax = plt.subplots(figsize=(6, 4))
+    labels_obf = ['Nominal', 'ML', 'Opt', 'Multi']
+    x_obf = np.arange(len(labels_obf))
+    bars_obf = ax.bar(x_obf, np.array(means_obf) / 100, color=[BLUE, RED, GREEN, PURPLE], width=0.4)
+    ax.set_ylabel(r'PSO Cost ($\times10^2$£)')
+    ax.set_ylim(0, y_max)
+    ax.set_xticks(x_obf)
+    ax.set_xticklabels(labels_obf)
+    ax.grid(True, alpha=0.3)
+    for rect in bars_obf:
+        height = rect.get_height()
+        ax.annotate(f'{height:.2f}', xy=(rect.get_x() + rect.get_width() / 2, height),
+                    xytext=(0, 3), textcoords="offset points", ha='center', va='bottom', fontsize=14)
+    plt.tight_layout()
+    plt.savefig(data_dir + f'bar_plot_obf_{uncertainty_budget}.pdf', dpi=300, bbox_inches='tight', pad_inches=0)
+    plt.close()
+
+
 def plot_uncertainty_performance(grid_name):
     # Load data
     data_dir = f'paper_exp/obf_result/obf_uncer/{grid_name}/' 
@@ -309,9 +379,15 @@ def plot_uncertainty_performance(grid_name):
     if grid_name == 'bus14':
         uncertainty_budget = [0.03, 0.05, 0.07]
         budget_percentage = ['3%', '5%', '7%']
+        fig_size = (8, 4)
+        rotation = 0
+        with_percentage = True
     else:
         uncertainty_budget = [0.05]
         budget_percentage = ['5%']
+        fig_size = (6, 4)
+        rotation = 0
+        with_percentage = False
 
     for idx, budget in enumerate(uncertainty_budget):
         # Load data for each budget
@@ -328,10 +404,14 @@ def plot_uncertainty_performance(grid_name):
         worst_cost_obf_robust = performance_dict['worst_cost_robust'] * 100
 
         # Create figure
-        fig, ax = plt.subplots(figsize=(8, 4))
+        fig, ax = plt.subplots(figsize=fig_size)
 
         # Set up data
-        labels = ['True', r'$\mathcal{P}_{train}^{abf}$', r'$\mathcal{P}_{train}^{obf/basic}$', r'$\mathcal{P}_{train}^{obf/uncer}$('+budget_percentage[idx]+')']
+        if with_percentage:
+            labels = ['True', r'$\mathcal{M}_{abf}$', r'$\mathcal{M}_{obf}$', r'$\mathcal{M}_{obf/uncer}$('+budget_percentage[idx]+')']
+        else:
+            labels = ['True', r'$\mathcal{M}_{abf}$', r'$\mathcal{M}_{obf}$', r'$\mathcal{M}_{obf/uncer}$']
+        
         original_costs = [np.mean(cost_true), np.mean(cost_abf), np.mean(cost_obf), np.mean(cost_obf_robust)]
         worst_costs = [np.mean(worst_cost_true), np.mean(worst_cost_abf), np.mean(worst_cost_obf), np.mean(worst_cost_obf_robust)]
 
@@ -348,8 +428,8 @@ def plot_uncertainty_performance(grid_name):
         width = 0.35
 
         # Create bars
-        rects1 = ax.bar(x, np.array(worst_costs) / 100, width, label='Worst-case Cost', color=RED)
-        rects2 = ax.bar(x, np.array(original_costs) / 100, width, label='Original Cost', color=BLUE)
+        rects1 = ax.bar(x, np.array(worst_costs) / 100, width, label='Worst', color=RED)
+        rects2 = ax.bar(x, np.array(original_costs) / 100, width, label='Nominal', color=BLUE)
 
         # Set up ylim
         if grid_name == 'bus14':
@@ -361,7 +441,7 @@ def plot_uncertainty_performance(grid_name):
         ax.set_ylabel(r'PSO Cost ($\times10^2$£)')
         # ax.set_title(f'Uncertainty Budget = {budget_percentage[idx]}')
         ax.set_xticks(x)
-        ax.set_xticklabels(labels)
+        ax.set_xticklabels(labels, rotation=rotation)
         ax.set_ylim(0, ylim)
         ax.grid(True, alpha=0.3)
         
@@ -376,7 +456,7 @@ def plot_uncertainty_performance(grid_name):
                         xy=(rect.get_x() + rect.get_width() / 2, height),
                         xytext=(0, offset),
                         textcoords="offset points",
-                        ha='center', va='bottom', fontsize=18)
+                        ha='center', va='bottom', fontsize=14)
 
         autolabel(rects1, offset=5)
         autolabel(rects2, offset=-1)
@@ -469,9 +549,9 @@ def draw_sensitivity(grid_name):
     width = 0.25
     
     # Create bars
-    rects1 = ax.bar(x - width, ABF_OBF_BASIC_COS_SIM, width, label=r'$\mathcal{P}_{train}^{abf}$ vs $\mathcal{P}_{train}^{obf/basic}$', color=RED)
-    rects2 = ax.bar(x, OBF_BASIC_OBF_SCO_COS_SIM, width, label=r'$\mathcal{P}_{train}^{obf/basic}$ vs $\mathcal{P}_{train}^{obf/sco}$', color=BLUE)
-    rects3 = ax.bar(x + width, ABF_OBF_SCO_COS_SIM, width, label=r'$\mathcal{P}_{train}^{abf}$ vs $\mathcal{P}_{train}^{obf/sco}$', color='#E6B3FF')
+    rects1 = ax.bar(x - width, ABF_OBF_BASIC_COS_SIM, width, label=r'$\mathcal{M}_{abf}$ vs $\mathcal{M}_{obf}$', color=RED)
+    rects2 = ax.bar(x, OBF_BASIC_OBF_SCO_COS_SIM, width, label=r'$\mathcal{M}_{obf}$ vs $\mathcal{M}_{obf/sco}$', color=BLUE)
+    rects3 = ax.bar(x + width, ABF_OBF_SCO_COS_SIM, width, label=r'$\mathcal{M}_{abf}$ vs $\mathcal{M}_{obf/sco}$', color='#E6B3FF')
     
     # Customize plot
     ax.set_ylabel('Cosine Similarity')
@@ -490,12 +570,12 @@ def draw_sensitivity(grid_name):
     width = 0.25
     
     # Create bars
-    rects1 = ax.bar(x - width, ABF_OBF_BASIC_Pearsonr, width, label=r'$\mathcal{P}_{train}^{abf}$ vs $\mathcal{P}_{train}^{obf/basic}$', color=RED)
-    rects2 = ax.bar(x, OBF_BASIC_OBF_SCO_Pearsonr, width, label=r'$\mathcal{P}_{train}^{obf/basic}$ vs $\mathcal{P}_{train}^{obf/sco}$', color=BLUE)
-    rects3 = ax.bar(x + width, ABF_OBF_SCO_Pearsonr, width, label=r'$\mathcal{P}_{train}^{abf}$ vs $\mathcal{P}_{train}^{obf/sco}$', color='#E6B3FF')
+    rects1 = ax.bar(x - width, ABF_OBF_BASIC_Pearsonr, width, label=r'$\mathcal{M}_{abf}$ vs $\mathcal{M}_{obf}$', color=RED)
+    rects2 = ax.bar(x, OBF_BASIC_OBF_SCO_Pearsonr, width, label=r'$\mathcal{M}_{obf}$ vs $\mathcal{M}_{obf/sco}$', color=BLUE)
+    rects3 = ax.bar(x + width, ABF_OBF_SCO_Pearsonr, width, label=r'$\mathcal{M}_{abf}$ vs $\mathcal{M}_{obf/sco}$', color='#E6B3FF')
     
     # Customize plot    
-    ax.set_ylabel('Pearsonr')
+    ax.set_ylabel("Pearson r")
     ax.set_xticks(x)
     ax.set_ylim(0, 1)
     ax.set_xticklabels(['Q1', 'Q2', 'Q3', 'Q4'])
@@ -507,12 +587,19 @@ def draw_sensitivity(grid_name):
     plt.close()
     
 if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--grid', type=str, default='bus14', help='Grid name: bus14')
-    args = parser.parse_args()
-    grid_name = args.grid
+    # import argparse
+    # parser = argparse.ArgumentParser()
+    # # parser.add_argument('--grid', type=str, default='bus14', help='Grid name: bus14')
+    # args = parser.parse_args()
+    # grid_name = args.grid
 
     # evaluate_obf_sco(grid_name=grid_name)
-    plot_uncertainty_performance(grid_name=grid_name)
+    # plot_uncertainty_performance(grid_name=grid_name)
     # draw_sensitivity(grid_name=grid_name)
+    # plot_uncertainty_performance_multi()
+    
+    # evaluate_obf_sco(grid_name="bus14")
+    for grid_name_ in ['bus14', 'bus39', 'bus57']:
+        plot_uncertainty_performance(grid_name=grid_name_)
+    # draw_sensitivity(grid_name="bus14")
+    # plot_uncertainty_performance_multi()
