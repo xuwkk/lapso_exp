@@ -184,6 +184,79 @@ class PS_Basic:
             return [int(i) - 1 for i in idx]
         return int(idx) - 1
 
+    def _build_dc_topology_from_branch(self, branch_df):
+        """Build DC topology matrices from a branch table."""
+        no_branch = len(branch_df)
+        Cf = np.zeros((no_branch, self.no_bus))
+        Ct = np.zeros((no_branch, self.no_bus))
+        for i in range(no_branch):
+            fbus = PS_Basic._to_python_idx(branch_df["F_BUS"].iloc[i])
+            tbus = PS_Basic._to_python_idx(branch_df["T_BUS"].iloc[i])
+            Cf[i, fbus] = 1
+            Ct[i, tbus] = 1
+
+        A = Cf - Ct
+        tap = branch_df["TAP"].to_numpy(dtype=float).copy()
+        tap[np.where(tap == 0)] = 1
+        x = branch_df["BR_X"].to_numpy(dtype=float)
+        Bff = 1 / (x * tap)
+        Bf = np.diag(Bff) @ A
+        Bbus = A.T @ Bf
+        Pfshift = -branch_df["SHIFT"].to_numpy(dtype=float) / 180 * np.pi * Bff
+        Pbusshift = A.T @ Pfshift
+
+        reduced_Bbus = Bbus[self.non_slack_idx, :][:, self.non_slack_idx]
+        ptdf = Bf[:, self.non_slack_idx] @ np.linalg.inv(reduced_Bbus)
+        identity_remove_slack = np.delete(np.eye(self.no_bus), self.slack_idx, axis=0)
+        ptdf = ptdf @ identity_remove_slack
+
+        return {
+            "branch": branch_df,
+            "no_branch": no_branch,
+            "Cf": Cf,
+            "Ct": Ct,
+            "A": A,
+            "Bf": Bf,
+            "Bbus": Bbus,
+            "Pfshift": Pfshift,
+            "Pbusshift": Pbusshift,
+            "ptdf": ptdf,
+        }
+
+    def build_min_reactance_trip_topology(self):
+        """Trip one in-service line with smallest reactance and rebuild DC matrices."""
+        branch_df = self.branch.copy(deep=True)
+
+        if "BR_STATUS" in branch_df.columns:
+            in_service = branch_df["BR_STATUS"].to_numpy(dtype=float) != 0
+        else:
+            in_service = np.ones(len(branch_df), dtype=bool)
+
+        if not np.any(in_service):
+            raise ValueError("No in-service branch found to trip.")
+
+        x = branch_df["BR_X"].to_numpy(dtype=float)
+        valid = in_service & np.isfinite(x) & (x > 0)
+        if not np.any(valid):
+            raise ValueError("No valid positive reactance in-service branch found to trip.")
+
+        candidate_idx = np.where(valid)[0]
+        trip_idx = candidate_idx[np.argmin(x[candidate_idx])]
+        tripped_line = branch_df.iloc[trip_idx].copy()
+
+        if "BR_STATUS" in branch_df.columns:
+            branch_tripped = branch_df.copy(deep=True)
+            branch_tripped.loc[trip_idx, "BR_STATUS"] = 0
+            branch_tripped = branch_tripped.loc[branch_tripped["BR_STATUS"] != 0].reset_index(drop=True)
+        else:
+            branch_tripped = branch_df.drop(index=trip_idx).reset_index(drop=True)
+
+        topo = self._build_dc_topology_from_branch(branch_tripped)
+        topo["trip_idx_original"] = int(trip_idx)
+        topo["trip_reactance"] = float(x[trip_idx])
+        topo["tripped_line"] = tripped_line
+        return topo
+
     def _gen_constraint(self, constraints, pg, ug, delta_pg=None):
         """Add generation constraints"""
         for t in range(self.T):

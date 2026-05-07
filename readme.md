@@ -127,6 +127,10 @@ sh run_sco.sh
 
 This will automatically learn data-driven small signal stability assessors using both linear and NN-based models. The trained assessors will be integrated into the unit commitment problem via SCO framework.
 
+#### Topology-Change gSCR Check
+
+The SCO pipeline now includes an additional comparison between the base topology and a single-line-outage topology obtained by tripping the in-service transmission line with the smallest reactance. This is intended as a simple stress-test for the generalized short-circuit ratio (gSCR).
+
 The results will be saved in `paper_exp/sco_result/`.
 
 ### Bus-14 OBF (Section VII-B in the paper)

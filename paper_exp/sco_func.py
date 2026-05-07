@@ -393,6 +393,60 @@ class SmallSignalStability:
         return np.array(ug_new), np.array(psolar_new)
 
 
+def _build_sorted_bbus_from_raw(uc, bbus_raw):
+    """Reorder a raw Bbus into [renewable, generator-bus, other] ordering."""
+    new_identity = np.zeros((uc.no_bus, uc.no_bus))
+    for i, idx in enumerate(uc.solar_idx):
+        new_identity[idx, i] = 1
+
+    start_idx = uc.no_solar
+    checked_gen_idx = []
+    i = 0
+    for idx in uc.gen_idx:
+        if idx not in checked_gen_idx:
+            new_identity[idx, i + start_idx] = 1
+            i += 1
+            checked_gen_idx.append(idx)
+
+    start_idx += len(checked_gen_idx)
+    for i, idx in enumerate(uc.not_gen_ren_idx):
+        new_identity[idx, i + start_idx] = 1
+
+    bbus_sorted = new_identity.T @ bbus_raw @ new_identity
+    return bbus_sorted
+
+
+def compute_gscr_with_min_x_trip(uc, xd, gscr_threshold, solar_min_clip, solar_max, ug, psolar):
+    """
+    Compute base-case gSCR and min-reactance-line-trip gSCR for the same (ug, psolar).
+
+    Returns:
+        dict with keys:
+            gscr_base
+            gscr_trip
+            trip_idx_original
+            trip_reactance
+            tripped_line
+    """
+    sss_base = SmallSignalStability(uc, xd, gscr_threshold, solar_min_clip, solar_max)
+    gscr_base = sss_base.compute_gSCR(ug, psolar)
+
+    topo_trip = uc.build_min_reactance_trip_topology()
+    bbus_trip_sorted = _build_sorted_bbus_from_raw(uc, topo_trip["Bbus"])
+
+    sss_trip = deepcopy(sss_base)
+    sss_trip.Bbus_sorted = bbus_trip_sorted
+    gscr_trip = sss_trip.compute_gSCR(ug, psolar)
+
+    return {
+        "gscr_base": gscr_base,
+        "gscr_trip": gscr_trip,
+        "trip_idx_original": topo_trip["trip_idx_original"],
+        "trip_reactance": topo_trip["trip_reactance"],
+        "tripped_line": topo_trip["tripped_line"],
+    }
+
+
 def train_logistic_assessor(input_space, label, type = 'linear_cbce'):
     """
     type:

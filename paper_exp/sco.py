@@ -1,6 +1,11 @@
 """
 A full implementation of the small-signal stability-constrained case study 
 for the SCO in the paper
+
+Two globel flags are set:
+1. GLOBAL_SAVE_FLAG: whether to save the results
+2. COMPARE_TRIP_FLAG: whether to compare the base topology gSCR 
+                    with min-reactance-line-tripped topology on the same input samples
 """
 
 import sys
@@ -20,10 +25,14 @@ from copy import deepcopy
 import time
 from tqdm import tqdm
 from paper_exp.sco_func import (SmallSignalStability, 
+                                compute_gscr_with_min_x_trip,
                                 train_logistic_assessor, 
                                 return_nn, 
                                 train_nn,
                                 evaluate_uc)
+
+GLOBAL_SAVE_FLAG = False
+COMPARE_TRIP_FLAG = True
 
 @hydra.main(version_base=None, config_path="../conf", config_name="config")
 def main(cfg: DictConfig):
@@ -75,9 +84,11 @@ def main(cfg: DictConfig):
     NO_DATA_TOTAL = load_total.shape[0]
     SOLAR_MAX = np.max(solar_total, axis=0)
     print(f"Solar Max: {SOLAR_MAX}")
+    
+    if GLOBAL_SAVE_FLAG:
+        np.save(saving_dir + 'load_total.npy', load_total)
+        np.save(saving_dir + 'solar_total.npy', solar_total)
 
-    np.save(saving_dir + 'load_total.npy', load_total)
-    np.save(saving_dir + 'solar_total.npy', solar_total)
     
     # Load optimization models
     uc = UC_DISCRETE(grid_xlsx, cfg.operation)
@@ -107,6 +118,33 @@ def main(cfg: DictConfig):
     # output_space: gSCR
     input_space, output_space = small_signal_stability.gen_dataset_small_signal(
                             solar_sample_no, solar_sample_ratio_list=solar_sample_ratio_list, verbose = True)
+    if COMPARE_TRIP_FLAG:
+        # Compare base topology gSCR with min-reactance-line-tripped topology on the same input samples
+        output_space_trip = []
+        trip_info = None
+        for i in range(input_space.shape[0]):
+            ug_sample = input_space[i, :uc.no_gen]
+            psolar_sample = input_space[i, uc.no_gen:uc.no_gen + uc.no_solar]
+            gscr_cmp = compute_gscr_with_min_x_trip(
+                uc, xd, gscr_threshold, solar_min_clip, SOLAR_MAX, ug_sample, psolar_sample
+            )
+            output_space_trip.append(gscr_cmp["gscr_trip"])
+            if trip_info is None:
+                trip_info = gscr_cmp
+        output_space_trip = np.array(output_space_trip)
+
+        base_unstable = output_space <= gscr_threshold
+        trip_unstable = output_space_trip <= gscr_threshold
+        unstable_flip_count = np.sum(base_unstable != trip_unstable)
+
+        print("=== Base vs Min-Reactance-Trip gSCR Comparison ===")
+        print(f"Tripped line original index: {trip_info['trip_idx_original']}")
+        print(f"Tripped line reactance: {trip_info['trip_reactance']}")
+        print(f"Base gSCR min/mean: {np.min(output_space):.4f}/{np.mean(output_space):.4f}")
+        print(f"Trip gSCR min/mean: {np.min(output_space_trip):.4f}/{np.mean(output_space_trip):.4f}")
+        print(f"Unstable-label flips (base vs trip): {unstable_flip_count} / {output_space.shape[0]}")
+        
+        exit()
     
     print('input space: ', input_space.shape, 'output space: ', output_space.shape)
     print('Input space one example:', input_space[0])
@@ -147,7 +185,8 @@ def main(cfg: DictConfig):
                                 torch.from_numpy(input_space).float(), 
                                 torch.from_numpy(label).float(), 
                                   **train_config) 
-            torch.save(classifier.state_dict(), os.path.join(saving_dir, f"{type}_classifier.pth"))
+            if GLOBAL_SAVE_FLAG:
+                torch.save(classifier.state_dict(), os.path.join(saving_dir, f"{type}_classifier.pth"))
     
     no_param = 0
     for param in classifier.parameters():
@@ -181,17 +220,18 @@ def main(cfg: DictConfig):
             no_binary_var_ori += np.prod(var.shape)
     print(f"Number of binary variables in the original problem: {no_binary_var_ori}")
     
-    np.save(os.path.join(saving_dir, "ori_result.npy"), {
-        'cost': cost_ori,
-        'gscr': gscr_ori,
-        'gscr_cls': gscr_cls_ori,
-        'ug': ug_ori,
-        'solarc': solarc_ori,
-        'solar': solar_ori,
-        'ls': ls_ori,
-        'time': time_ori / test_sample_idx.shape[0],
-        'no_binary_var': no_binary_var_ori
-    }, allow_pickle=True)
+    if GLOBAL_SAVE_FLAG:
+        np.save(os.path.join(saving_dir, "ori_result.npy"), {
+            'cost': cost_ori,
+            'gscr': gscr_ori,
+            'gscr_cls': gscr_cls_ori,
+            'ug': ug_ori,
+            'solarc': solarc_ori,
+            'solar': solar_ori,
+            'ls': ls_ori,
+            'time': time_ori / test_sample_idx.shape[0],
+            'no_binary_var': no_binary_var_ori
+        }, allow_pickle=True)
     print('===Convert the original problem to the SCO problem===')
     
     lower_bound = np.zeros(uc.no_gen + uc.no_solar)
@@ -329,18 +369,19 @@ def main(cfg: DictConfig):
             no_trainable_param += param.numel()
     print(f"Number of trainable parameters in the classifier: {no_trainable_param}")
     
-    np.save(os.path.join(saving_dir, "sco_result.npy"), {
-        'cost': cost_sco,
-        'gscr': gscr_sco,
-        'gscr_cls': gscr_cls_sco,
-        'ug': ug_sco,
-        'solarc': solarc_sco,
-        'solar': solar_sco,
-        'ls': ls_sco,
-        'time': time_sco / test_sample_idx.shape[0],
-        'no_binary_var': no_binary_var_sco,
-        'no_trainable_param': no_trainable_param
-    }, allow_pickle=True)
+    if GLOBAL_SAVE_FLAG:
+        np.save(os.path.join(saving_dir, "sco_result.npy"), {
+            'cost': cost_sco,
+            'gscr': gscr_sco,
+            'gscr_cls': gscr_cls_sco,
+            'ug': ug_sco,
+            'solarc': solarc_sco,
+            'solar': solar_sco,
+            'ls': ls_sco,
+            'time': time_sco / test_sample_idx.shape[0],
+            'no_binary_var': no_binary_var_sco,
+            'no_trainable_param': no_trainable_param
+        }, allow_pickle=True)
     
 if __name__ == "__main__":
     main()
