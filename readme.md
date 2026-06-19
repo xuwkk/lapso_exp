@@ -4,7 +4,7 @@
 <img src="repo_figure/repo_lapso_logo.png" alt="LAPSO" width="200"/>
 </p>
 
-> **Important Update**: The `pso` package has been published as a standalone package, and renamed as `GridForge`. Please refer to the [GridForge](https://github.com/xuwkk/gridforge) repository for the latest updates.
+> **Important Update**: The `pso` package has been published as a standalone package, and renamed as `GridForge`. Please refer to the [GridForge](https://github.com/xuwkk/gridforge) repository for the latest updates. You can now install the `GridForge` package by `pip install powergridforge`.
 
 This repository contains the code for paper *"A Unified Optimization View for Learning-Augmented Power System Operations"* by Dr. Wangkun Xu (Imperial College London), Prof. Zhongda Chu (Tianjin University), and Prof. Fei Teng (Imperial College London). The paper is under review ([preprint available](https://arxiv.org/abs/2505.05203)) and more code will be released after the review process. This repository is maintained by Wangkun Xu.
 
