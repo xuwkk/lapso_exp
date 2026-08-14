@@ -4,6 +4,10 @@
 <img src="repo_figure/repo_lapso_logo.png" alt="LAPSO" width="200"/>
 </p>
 
+> **Important Update Aug. 10 2026**: The paper is accepted by the IEEE Transactions on Power Systems.
+
+> **Important Update Aug. 01 2026**: Based on the LAPSO framework, we have open-sourced a new differentable optimization package for efficient objective-based forecasting with Neural Network-based forecaster. Please refer to the [DiffAPQP](https://github.com/xuwkk/diffapqp) repository, [documentation](https://xuwkk.github.io/diffapqp/), [pip install diffapqp](https://pypi.org/project/diffapqp/), and [arXiv preprint](https://arxiv.org/abs/2608.04189).
+
 > **Important Update**: The `pso` package has been published as a standalone package, and renamed as `GridForge`. Please refer to the [GridForge](https://github.com/xuwkk/gridforge) repository for the latest updates. You can now install the `GridForge` package by `pip install powergridforge`.
 
 This repository contains the code for paper *"A Unified Optimization View for Learning-Augmented Power System Operations"* by Dr. Wangkun Xu (Imperial College London), Prof. Zhongda Chu (Tianjin University), and Prof. Fei Teng (Imperial College London). The paper is under review ([preprint available](https://arxiv.org/abs/2505.05203)) and more code will be released after the review process. This repository is maintained by Wangkun Xu.
