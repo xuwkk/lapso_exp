@@ -1,3 +1,5 @@
+
+
 # LAPSO: Learning-Augmented Power System Operation
 
 <p align="center">
@@ -8,7 +10,7 @@
 
 > **Update Aug. 10 2026**: The paper is accepted by the IEEE Transactions on Power Systems. [Link to IEEE Xplore](https://ieeexplore.ieee.org/document/11663065)/
 
-> **Update Aug. 01 2026**: Based on the LAPSO framework, we have open-sourced a new differentable optimization package for efficient objective-based forecasting with Neural Network-based forecaster. Please refer to the [DiffAPQP](https://github.com/xuwkk/diffapqp) repository, [documentation](https://xuwkk.github.io/diffapqp/), [pip install diffapqp](https://pypi.org/project/diffapqp/), and [arXiv preprint](https://arxiv.org/abs/2608.04189).
+> **Update Aug. 01 2026**: Based on the LAPSO framework, we have open-sourced a new differentiable optimization package for efficient objective-based forecasting with Neural Network-based forecaster. Please refer to the [DiffAPQP](https://github.com/xuwkk/diffapqp) repository, [documentation](https://xuwkk.github.io/diffapqp/), [pip install diffapqp](https://pypi.org/project/diffapqp/), and [arXiv preprint](https://arxiv.org/abs/2608.04189).
 
 > **Update**: The `pso` package has been published as a standalone package, and renamed as `GridForge`. Please refer to the [GridForge](https://github.com/xuwkk/gridforge) repository for the latest updates. You can now install the `GridForge` package by `pip install powergridforge`.
 
